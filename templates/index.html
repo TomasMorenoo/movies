@@ -1,0 +1,181 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    .stat-card { background-color: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 15px; }
+    .stat-value { color: var(--accent); font-weight: 700; font-size: 1.8rem; line-height: 1; }
+    .movie-card { position: relative; overflow: hidden; border: none; border-radius: 10px; cursor: pointer; transition: transform 0.2s; }
+    .movie-info-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(18, 18, 18, 0.95); color: white; opacity: 0; transition: opacity 0.3s ease; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; }
+    .movie-card:hover .movie-info-overlay, .movie-card.touch-active .movie-info-overlay { opacity: 1; }
+    .badge-score { position: absolute; top: 10px; right: 10px; z-index: 2; transition: opacity 0.3s ease; }
+    .controls-container { background-color: var(--bg-card); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,255,255,0.05); }
+    .form-select, .search-input { background-color: #121212; border: 1px solid rgba(255,255,255,0.1); color: white; }
+    .form-select:focus, .search-input:focus { border-color: var(--accent); box-shadow: none; color: white; background-color: #121212; }
+    .nav-tabs .nav-link { color: var(--text-muted); border: none; }
+    .nav-tabs .nav-link.active { color: var(--accent) !important; background: transparent; border-bottom: 2px solid var(--accent); }
+    .movie-card:hover .badge-score, .movie-card.touch-active .badge-score { opacity: 0; }
+</style>
+
+<div class="row mb-4 px-2">
+    <div class="col-4 px-1">
+        <div class="stat-card text-center p-3 h-100 shadow-sm d-flex flex-column justify-content-center">
+            <div class="stat-value mb-1">{{ stats.total }}</div>
+            <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">Películas</small>
+        </div>
+    </div>
+    <div class="col-4 px-1">
+        <div class="stat-card text-center p-3 h-100 shadow-sm d-flex flex-column justify-content-center">
+            <div class="stat-value mb-1">{{ stats.promedio }}<span style="font-size: 0.5em; color: var(--text-muted);">/100</span></div>
+            <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">Promedio</small>
+        </div>
+    </div>
+    <div class="col-4 px-1">
+        <div class="stat-card text-center p-3 h-100 shadow-sm d-flex flex-column justify-content-center">
+            <div class="stat-value mb-1 text-truncate fs-5 mt-1">{{ stats.plataforma }}</div>
+            <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">Top Medio</small>
+        </div>
+    </div>
+</div>
+
+<div class="controls-container mb-4 shadow-sm">
+    <div class="row g-2">
+        <div class="col-md-8">
+            <input type="text" id="liveSearch" class="form-control search-input" placeholder="🔍 Buscar película en tu Vault...">
+        </div>
+        <div class="col-md-4">
+            <select id="sortSelect" class="form-select">
+                <option value="date-desc" selected>📅 Más Recientes</option>
+                <option value="date-asc">📅 Más Antiguas</option>
+                <option value="score-desc">⭐ Mejor Puntuadas</option>
+                <option value="alpha-asc">🔤 Orden Alfabético</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-4 border-secondary" id="myTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold" id="coleccion-tab" data-bs-toggle="tab" data-bs-target="#coleccion" type="button" role="tab">Mi Colección</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold" id="watchlist-tab" data-bs-toggle="tab" data-bs-target="#watchlist" type="button" role="tab">Watchlist ({{ pendientes|length }})</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="myTabContent">
+    <div class="tab-pane fade show active" id="coleccion" role="tabpanel">
+        <div class="row" id="moviesGrid">
+            {% for movie in peliculas %}
+            <div class="col-6 col-md-3 mb-4 movie-item" data-title="{{ movie.title | lower }}" data-date="{{ movie.date_watched or '0000-00-00' }}" data-score="{{ movie.rating if movie.rating != None else (-2 if movie.abandoned else -1) }}">
+                <div class="card h-100 movie-card shadow-lg" onclick="this.classList.toggle('touch-active')">
+                    {% if movie.poster_path %}
+                    <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" class="card-img-top h-100 object-fit-cover" loading="lazy">
+                    {% else %}
+                    <div class="card-img-top bg-secondary text-white d-flex align-items-center justify-content-center" style="height: 300px;">Sin Imagen</div>
+                    {% endif %}
+                    
+                    {% if movie.abandoned %}
+                        <div class="badge-score d-flex rounded overflow-hidden shadow border border-danger">
+                            <div class="bg-dark text-danger px-2 py-1 fw-bold" style="font-size: 0.8rem;">❌ Abandonada</div>
+                        </div>
+                    {% elif movie.rating != None %}
+                        {% set bg_color = '#FF1744' %}{% set text_color = 'white' %}
+                        {% if movie.rating == 100 %}{% set bg_color = 'var(--accent)' %}{% set text_color = 'black' %}
+                        {% elif movie.rating >= 90 %}{% set bg_color = '#FFD700' %}{% set text_color = 'black' %}
+                        {% elif movie.rating >= 75 %}{% set bg_color = '#00E676' %}{% set text_color = 'black' %}
+                        {% elif movie.rating >= 55 %}{% set bg_color = '#FFEA00' %}{% set text_color = 'black' %}
+                        {% elif movie.rating >= 35 %}{% set bg_color = '#FF9100' %}{% set text_color = 'black' %}{% endif %}
+                        
+                        <div class="badge-score d-flex rounded overflow-hidden shadow" style="border: 1px solid rgba(0,0,0,0.8);">
+                            <div class="bg-dark text-light px-2 py-1 d-flex align-items-center" style="font-size: 0.85rem;">★</div>
+                            <div class="px-2 py-1 fw-bold d-flex align-items-center" style="background-color: {{ bg_color }}; color: {{ text_color }}; font-size: 0.85rem;">{{ movie.rating }}</div>
+                        </div>
+                    {% else %}
+                        <div class="badge-score d-flex rounded overflow-hidden shadow border border-secondary">
+                            <div class="bg-dark text-light px-2 py-1 fw-bold" style="font-size: 0.8rem;">🔄 Ver de nuevo</div>
+                        </div>
+                    {% endif %}
+
+                    <div class="movie-info-overlay text-center">
+                        <h6 class="fw-bold mb-2" style="color: var(--accent);">{{ movie.title }}</h6>
+                        <p class="mb-1" style="font-size: 0.75rem;"><strong>Dir:</strong> {{ movie.director }}</p>
+                        <p class="mb-2" style="font-size: 0.7rem;"><strong>Cast:</strong> {{ movie.cast }}</p>
+                        <hr class="border-light opacity-25 my-1">
+                        <p class="mb-1 mt-1" style="font-size: 0.75rem;"><strong>Plataforma:</strong> {{ movie.platform or 'N/A' }}</p>
+                        <p class="mb-1" style="font-size: 0.75rem;"><strong>Fecha:</strong> {{ movie.date_watched or ('Abandonada' if movie.abandoned else 'Hace mucho') }}</p>
+                        {% if movie.opinion %}
+                        <div class="mt-2 p-2 rounded" style="background: rgba(255,255,255,0.05);">
+                            <p class="m-0 fst-italic text-truncate" style="font-size: 0.7rem;">"{{ movie.opinion }}"</p>
+                        </div>
+                        {% endif %}
+                        <div class="mt-auto pt-3 d-flex gap-2">
+                            <a href="{{ url_for('edit_movie', id=movie.id) }}" class="btn btn-outline-light btn-sm w-50 rounded-pill" style="font-size: 0.75rem;">Editar</a>
+                            <form action="{{ url_for('delete_movie', id=movie.id) }}" method="POST" class="w-50" onsubmit="return confirm('¿Borrar película?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm w-100 rounded-pill" style="font-size: 0.75rem;">Borrar</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12"><div class="alert text-center border" style="background-color: var(--bg-card); color: var(--text-muted); border-color: rgba(255,255,255,0.1)!important;">Aún no hay películas en Mobatai Vault.</div></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="watchlist" role="tabpanel">
+        <div class="row">
+            {% for movie in pendientes %}
+            <div class="col-6 col-md-3 mb-4">
+                <div class="card h-100 movie-card shadow-lg" onclick="this.classList.toggle('touch-active')">
+                    {% if movie.poster_path %}
+                    <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" class="card-img-top h-100 object-fit-cover" loading="lazy">
+                    {% endif %}
+                    <span class="badge bg-info text-dark badge-score shadow" style="font-size: 0.85rem; padding: 5px 10px;">📌 Pendiente</span>
+                    <div class="movie-info-overlay text-center d-flex flex-column justify-content-center">
+                        <h6 class="fw-bold mb-2 text-info">{{ movie.title }}</h6>
+                        <p class="mb-1" style="font-size: 0.75rem;"><strong>Dir:</strong> {{ movie.director }}</p>
+                        <p class="mb-2" style="font-size: 0.7rem;"><strong>Cast:</strong> {{ movie.cast }}</p>
+                        <div class="mt-auto pt-3 d-flex gap-2">
+                            <a href="{{ url_for('edit_movie', id=movie.id) }}" class="btn btn-info btn-sm w-50 rounded-pill text-dark fw-bold" style="font-size: 0.75rem;">Ya la vi</a>
+                            <form action="{{ url_for('delete_movie', id=movie.id) }}" method="POST" class="w-50" onsubmit="return confirm('¿Quitar de la lista?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm w-100 rounded-pill" style="font-size: 0.75rem;">Borrar</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const searchInput = document.getElementById('liveSearch');
+        const sortSelect = document.getElementById('sortSelect');
+        const grid = document.getElementById('moviesGrid');
+        let movieItems = Array.from(document.querySelectorAll('.movie-item'));
+
+        if(searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                const term = e.target.value.toLowerCase();
+                movieItems.forEach(item => {
+                    item.style.display = item.getAttribute('data-title').includes(term) ? 'block' : 'none';
+                });
+            });
+        }
+        if(sortSelect) {
+            sortSelect.addEventListener('change', function(e) {
+                const sortType = e.target.value;
+                movieItems.sort((a, b) => {
+                    if(sortType === 'date-desc') return b.getAttribute('data-date').localeCompare(a.getAttribute('data-date'));
+                    else if(sortType === 'date-asc') return a.getAttribute('data-date').localeCompare(b.getAttribute('data-date'));
+                    else if(sortType === 'score-desc') return parseInt(b.getAttribute('data-score')) - parseInt(a.getAttribute('data-score'));
+                    else if(sortType === 'alpha-asc') return a.getAttribute('data-title').localeCompare(b.getAttribute('data-title'));
+                });
+                movieItems.forEach(item => grid.appendChild(item));
+            });
+        }
+    });
+</script>
+{% endblock %}

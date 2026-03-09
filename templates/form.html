@@ -1,0 +1,166 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    .scroll-horizontal::-webkit-scrollbar { display: none; }
+    .scroll-horizontal { -ms-overflow-style: none; scrollbar-width: none; cursor: grab; }
+    .movie-select-card { cursor: pointer; transition: all 0.2s ease; border: 2px solid transparent; border-radius: 10px; background-color: var(--bg-card); }
+    .movie-select-card:hover { transform: translateY(-5px); border-color: rgba(255,255,255,0.3); }
+    .movie-select-card.selected { border-color: var(--accent); box-shadow: 0 10px 20px rgba(0, 229, 255, 0.2); }
+    .form-section-card { background-color: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px; }
+    .form-select { background-color: var(--bg-card); color: var(--text-main); border: 1px solid rgba(255, 255, 255, 0.1); }
+    .form-select:focus { background-color: var(--bg-card); color: var(--text-main); border-color: var(--accent); box-shadow: 0 0 0 0.25rem rgba(0, 229, 255, 0.25); }
+    .info-tooltip-container { position: relative; display: inline-block; cursor: help; margin-left: 8px; color: var(--accent); font-size: 1.1rem; }
+    .info-tooltip-content { visibility: hidden; width: 260px; background-color: #121212; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 12px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; font-size: 0.75rem; font-weight: normal; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+    .info-tooltip-content::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #121212 transparent transparent transparent; }
+    .info-tooltip-container:hover .info-tooltip-content { visibility: visible; opacity: 1; }
+    .color-box { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
+</style>
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <h3 class="mb-4 fw-bold">Nueva Entrada</h3>
+        <form method="POST" action="{{ url_for('form') }}" class="mb-4">
+            <div class="input-group input-group-lg shadow-sm">
+                <input type="text" name="query" class="form-control fs-6" placeholder="Buscar título en TMDB..." required autofocus>
+                <button class="btn btn-accent px-3 fs-6" type="submit">Buscar</button>
+            </div>
+        </form>
+
+        {% if resultados %}
+        <h6 class="text-muted mb-2 small fw-bold text-uppercase tracking-wide">Resultados</h6>
+        <div class="d-flex flex-nowrap overflow-auto scroll-horizontal pb-3 gap-3 mb-4" id="resultsContainer">
+            {% for res in resultados %}
+            <div class="card movie-select-card text-light flex-shrink-0" style="width: 130px;" onclick="selectMovie('{{ res.id }}', '{{ res.title | replace("'", "\\'") }}', '{{ res.poster_path or '' }}', this)">
+                {% if res.poster_path %}
+                <img src="https://image.tmdb.org/t/p/w200{{ res.poster_path }}" class="card-img-top rounded-top" style="height: 190px; object-fit: cover;">
+                {% else %}
+                <div class="card-img-top bg-dark d-flex align-items-center justify-content-center rounded-top" style="height: 190px;"><span class="small text-muted">No IMG</span></div>
+                {% endif %}
+                <div class="card-body p-2 text-center"><small class="d-block text-truncate fw-bold" style="font-size: 0.75rem;">{{ res.title }}</small></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="form-section-card shadow-lg">
+            <h5 class="mb-3 fw-bold">Detalles de visualización</h5>
+            <div id="selectionAlert" class="alert alert-info py-2 mb-3" style="background-color: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.2); color: var(--accent);">
+                <small>👆 Buscá y seleccioná una película arriba.</small>
+            </div>
+
+            <form action="{{ url_for('save_movie') }}" method="POST" id="mainForm">
+                <input type="hidden" name="tmdb_id" id="hidden_tmdb_id" required>
+                <input type="hidden" name="title" id="hidden_title">
+                <input type="hidden" name="poster_path" id="hidden_poster_path">
+
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-2">
+                        <div class="form-check" style="background: rgba(0, 229, 255, 0.05); padding: 10px 10px 10px 35px; border-radius: 8px; border: 1px solid rgba(0,229,255,0.2);">
+                            <input class="form-check-input" type="checkbox" id="checkHaceMucho" onchange="updateChecks('checkHaceMucho')" style="border-color: var(--accent);">
+                            <label class="form-check-label text-light small fw-bold" for="checkHaceMucho">Vi hace mucho (Omitir info)</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <div class="form-check" style="background: rgba(255, 23, 68, 0.05); padding: 10px 10px 10px 35px; border-radius: 8px; border: 1px solid rgba(255,23,68,0.2);">
+                            <input class="form-check-input" type="checkbox" name="abandoned" id="checkAbandonada" onchange="updateChecks('checkAbandonada')" style="border-color: #FF1744;">
+                            <label class="form-check-label text-light small fw-bold" for="checkAbandonada">❌ Abandonada a la mitad</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small fw-bold">FECHA</label>
+                        <input type="date" name="date_watched" id="inputFecha" class="form-control">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small fw-bold">PLATAFORMA</label>
+                        <select name="platform" class="form-select" required>
+                            <option value="" disabled selected>Selecciona...</option>
+                            <option value="Netflix">Netflix</option><option value="HBO">HBO</option>
+                            <option value="Amazon Prime">Amazon Prime</option><option value="Disney+">Disney+</option>
+                            <option value="Magis">Magis</option><option value="Apple TV">Apple TV</option>
+                            <option value="Stremio">Stremio</option><option value="Cine">Cine</option>
+                            <option value="Cable/TV">Cable / TV</option><option value="Otro">Otro...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-bold d-flex align-items-center">
+                        PUNTAJE (0-100)
+                        <div class="info-tooltip-container">ⓘ
+                            <div class="info-tooltip-content text-start">
+                                <strong class="d-block mb-2 text-white border-bottom border-secondary pb-1">Escala de Mobatai Vault:</strong>
+                                <div class="mb-1"><span class="color-box" style="background:var(--accent);"></span><strong>100:</strong> Perfección Absoluta.</div>
+                                <div class="mb-1"><span class="color-box" style="background:#FFD700;"></span><strong>90-99:</strong> Obra Maestra.</div>
+                                <div class="mb-1"><span class="color-box" style="background:#00E676;"></span><strong>75-89:</strong> Muy Buena / Excelente.</div>
+                                <div class="mb-1"><span class="color-box" style="background:#FFEA00;"></span><strong>55-74:</strong> Pasable / Buena.</div>
+                                <div class="mb-1"><span class="color-box" style="background:#FF9100;"></span><strong>35-54:</strong> Floja / Regular.</div>
+                                <div><span class="color-box" style="background:#FF1744;"></span><strong>0-34:</strong> Inmirable / Desastre.</div>
+                            </div>
+                        </div>
+                    </label>
+                    <input type="number" name="rating" id="inputPuntaje" class="form-control" min="0" max="100" placeholder="Vacío = Ver de nuevo">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-bold">OPINIÓN</label>
+                    <textarea name="opinion" class="form-control" rows="2" placeholder="Tus notas..."></textarea>
+                </div>
+
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" name="action" value="vault" class="btn btn-light w-50 fw-bold rounded-pill" id="submitBtn" disabled>Guardar</button>
+                    <button type="submit" name="action" value="watchlist" class="btn btn-outline-info w-50 fw-bold rounded-pill" id="watchBtn" disabled formnovalidate>A Watchlist</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function selectMovie(id, title, poster, element) {
+        document.getElementById('hidden_tmdb_id').value = id;
+        document.getElementById('hidden_title').value = title;
+        document.getElementById('hidden_poster_path').value = poster;
+
+        let cards = document.querySelectorAll('.movie-select-card');
+        cards.forEach(card => card.classList.remove('selected'));
+        element.classList.add('selected');
+
+        document.getElementById('selectionAlert').style.display = 'none';
+        document.getElementById('submitBtn').disabled = false;
+        document.getElementById('watchBtn').disabled = false;
+        document.getElementById('submitBtn').classList.replace('btn-light', 'btn-accent');
+        
+        document.querySelector('.form-section-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function updateChecks(clickedId) {
+        let checkHace = document.getElementById('checkHaceMucho');
+        let checkAband = document.getElementById('checkAbandonada');
+        let inputF = document.getElementById('inputFecha');
+        let inputP = document.getElementById('inputPuntaje');
+
+        if(clickedId === 'checkAbandonada' && checkAband.checked) checkHace.checked = false;
+        if(clickedId === 'checkHaceMucho' && checkHace.checked) checkAband.checked = false;
+
+        if (checkHace.checked) {
+            inputF.disabled = true; inputF.value = '';
+            inputP.disabled = true; inputP.value = '';
+        } else if (checkAband.checked) {
+            inputF.disabled = false;
+            inputP.disabled = true; inputP.value = '';
+        } else {
+            inputF.disabled = false; inputP.disabled = false;
+        }
+    }
+
+    const scrollContainer = document.getElementById("resultsContainer");
+    if(scrollContainer) {
+        scrollContainer.addEventListener("wheel", (evt) => {
+            evt.preventDefault(); scrollContainer.scrollLeft += evt.deltaY * 2;
+        });
+    }
+</script>
+{% endblock %}

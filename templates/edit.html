@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    .form-section-card { background-color: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px; }
+    .form-select { background-color: var(--bg-card); color: var(--text-main); border: 1px solid rgba(255, 255, 255, 0.1); }
+    .form-select:focus { background-color: var(--bg-card); color: var(--text-main); border-color: var(--accent); box-shadow: 0 0 0 0.25rem rgba(0, 229, 255, 0.25); }
+</style>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-light me-3 rounded-circle">←</a>
+            <h3 class="fw-bold mb-0">Editar: <span class="text-warning">{{ peli.title }}</span></h3>
+        </div>
+
+        <div class="form-section-card shadow-lg">
+            <form action="{{ url_for('edit_movie', id=peli.id) }}" method="POST">
+                
+                <div class="form-check mb-4" style="background: rgba(255, 23, 68, 0.05); padding: 10px 10px 10px 35px; border-radius: 8px; border: 1px solid rgba(255,23,68,0.2);">
+                    <input class="form-check-input" type="checkbox" name="abandoned" id="checkAbandonada" {% if peli.abandoned %}checked{% endif %} style="border-color: #FF1744;" onchange="togglePuntaje()">
+                    <label class="form-check-label text-light small fw-bold" for="checkAbandonada">❌ Abandonada a la mitad</label>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small fw-bold">FECHA</label>
+                        <input type="date" name="date_watched" class="form-control" value="{{ peli.date_watched or '' }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small fw-bold">PLATAFORMA</label>
+                        <select name="platform" class="form-select" required>
+                            <option value="Netflix" {% if peli.platform == 'Netflix' %}selected{% endif %}>Netflix</option>
+                            <option value="HBO" {% if peli.platform == 'HBO' %}selected{% endif %}>HBO</option>
+                            <option value="Amazon Prime" {% if peli.platform == 'Amazon Prime' %}selected{% endif %}>Amazon Prime</option>
+                            <option value="Disney+" {% if peli.platform == 'Disney+' %}selected{% endif %}>Disney+</option>
+                            <option value="Magis" {% if peli.platform == 'Magis' %}selected{% endif %}>Magis</option>
+                            <option value="Apple TV" {% if peli.platform == 'Apple TV' %}selected{% endif %}>Apple TV</option>
+                            <option value="Stremio" {% if peli.platform == 'Stremio' %}selected{% endif %}>Stremio</option>
+                            <option value="Cine" {% if peli.platform == 'Cine' %}selected{% endif %}>Cine</option>
+                            <option value="Cable/TV" {% if peli.platform == 'Cable/TV' %}selected{% endif %}>Cable / TV</option>
+                            <option value="Otro" {% if peli.platform == 'Otro' %}selected{% endif %}>Otro...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-bold">PUNTAJE (0-100)</label>
+                    <input type="number" name="rating" id="inputPuntaje" class="form-control" min="0" max="100" placeholder="Vacío = Ver de nuevo" value="{{ peli.rating if peli.rating != None else '' }}" {% if peli.abandoned %}disabled{% endif %}>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-muted small fw-bold">OPINIÓN</label>
+                    <textarea name="opinion" class="form-control" rows="3">{{ peli.opinion or '' }}</textarea>
+                </div>
+
+                <button type="submit" class="btn btn-accent w-100 fw-bold rounded-pill">Actualizar Película</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function togglePuntaje() {
+        let isChecked = document.getElementById('checkAbandonada').checked;
+        let inputP = document.getElementById('inputPuntaje');
+        if (isChecked) { inputP.value = ''; inputP.disabled = true; } 
+        else { inputP.disabled = false; }
+    }
+</script>
+{% endblock %}
