@@ -264,15 +264,22 @@ def oracle():
         
     historial = []
     for p in mis_pelis:
-        estado = "Abandonada" if p.abandoned else f"Puntaje: {p.rating}/100" if p.rating else "Vista"
-        historial.append(f"'{p.title}' ({estado})")
+        # Detectamos si es una película que está solo en la Watchlist (sin calificar ni abandonar)
+        if p.is_watchlist and not p.rating and not p.abandoned:
+            historial.append(f"'{p.title}' (En mi Watchlist - NO RECOMENDAR)")
+        elif p.abandoned:
+            historial.append(f"'{p.title}' (Abandonada - Odio esto)")
+        elif p.rating:
+            historial.append(f"'{p.title}' (Puntaje: {p.rating}/100)")
+        else:
+            historial.append(f"'{p.title}' (Vista)")
             
     reporte_peliculas = ", ".join(historial)
     
-    # FORZAMOS A LA IA A DEVOLVER JSON PURO
+    # FORZAMOS A LA IA A DEVOLVER JSON PURO Y ESQUIVAR LA WATCHLIST
     prompt = f"""
     Eres 'El Oráculo', un experto cinéfilo. Analiza mi historial: {reporte_peliculas}.
-    Recomiéndame 3 películas que NO estén en esta lista.
+    Recomiéndame 3 películas que NO estén en esta lista (es vital que ignores las que dicen "NO RECOMENDAR" porque ya las tengo pendientes).
     Devuelve ÚNICAMENTE un arreglo JSON válido con esta estructura exacta, sin texto adicional ni formato markdown:
     [
         {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué me va a gustar..."}}
