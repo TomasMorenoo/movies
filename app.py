@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, Response
-from models import db, Movie
+from models import db, Movie, User
 from tmdb_helper import search_movie, get_movie_details
 import os
 import csv
@@ -10,12 +10,13 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = 'super_secreto_para_cookies'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///movies.sqlite3'
+# Lee la URL de la base de datos desde tu archivo .env (PostgreSQL)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
-PIN_SECRETO = os.getenv('APP_PIN', '0000')
 
+# Crea las tablas (User y Movie) automáticamente si no existen
 with app.app_context():
     db.create_all()
 
@@ -28,42 +29,74 @@ def manifest():
 def sw():
     return send_from_directory('static', 'sw.js')
 
-# --- AUTENTICACIÓN ---
+# --- AUTENTICACIÓN Y REGISTRO ---
 @app.route('/', methods=['GET', 'POST'])
 def login():
-    if session.get('autorizado'):
+    if session.get('user_id'):
         return redirect(url_for('index'))
     
+    error = None
     if request.method == 'POST':
-        if request.form.get('pin') == PIN_SECRETO:
-            session['autorizado'] = True
+        # 1. Agarramos lo que escribió (solo le sacamos los espacios, dejamos las mayúsculas)
+        username_input = request.form.get('username').strip()
+        password = request.form.get('password')
+        
+        # 2. Magia pura: Convertimos temporalmente la base y el texto a minúsculas solo para comparar
+        user = User.query.filter(db.func.lower(User.username) == username_input.lower()).first()
+        
+        if user and user.check_password(password):
+            session['user_id'] = user.id
+            # 3. Guardamos en la sesión el nombre original tal cual está en la base de datos
+            session['username'] = user.username
             session.permanent = True
             return redirect(url_for('index'))
         else:
-            return "PIN Incorrecto", 401
+            error = "Usuario o contraseña incorrectos"
             
-    return '''
-        <div style="display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; background-color:#121212; color:white;">
-            <form method="post" style="text-align:center;">
-                <h2>Mobatai<span>Vault</span></h2>
-                <input type="password" name="pin" placeholder="Ingresa tu PIN" style="padding:10px; font-size:16px; margin-top:10px; border-radius: 5px; border: none;">
-                <button type="submit" style="padding:10px 20px; font-size:16px; background-color: #00E5FF; color: black; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">Entrar</button>
-            </form>
-        </div>
-    '''
+    return render_template('login.html', error=error, mode='login')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if session.get('user_id'):
+        return redirect(url_for('index'))
+    
+    error = None
+    if request.method == 'POST':
+        # Agarramos el texto original
+        username_input = request.form.get('username').strip()
+        password = request.form.get('password')
+        
+        # Verificamos si existe alguien con ese nombre (ignorando mayúsculas)
+        existe = User.query.filter(db.func.lower(User.username) == username_input.lower()).first()
+        
+        if existe:
+            error = "El usuario ya existe. Elegí otro."
+        else:
+            # Guardamos el usuario con el formato EXACTO que escribió
+            nuevo_usuario = User(username=username_input)
+            nuevo_usuario.set_password(password)
+            db.session.add(nuevo_usuario)
+            db.session.commit()
+            
+            session['user_id'] = nuevo_usuario.id
+            session['username'] = nuevo_usuario.username
+            return redirect(url_for('index'))
+            
+    return render_template('login.html', error=error, mode='register')
 
 @app.route('/logout')
 def logout():
-    session.pop('autorizado', None)
+    session.clear()
     return redirect(url_for('login'))
 
 # --- BACKUP ---
 @app.route('/dashboard/export')
 def export_csv():
-    if not session.get('autorizado'):
+    if not session.get('user_id'):
         return redirect(url_for('login'))
         
-    peliculas = Movie.query.all()
+    # Solo exporta las películas del usuario logueado
+    peliculas = Movie.query.filter_by(user_id=session['user_id']).all()
     
     def generate():
         data = StringIO()
@@ -74,7 +107,6 @@ def export_csv():
         data.truncate(0)
         
         for p in peliculas:
-            # Determinamos el estado real para el Excel
             estado = 'Watchlist' if p.is_watchlist else ('Abandonada' if p.abandoned else 'Colección')
             writer.writerow([
                 p.tmdb_id, p.title, estado, p.date_watched or 'N/A', 
@@ -85,24 +117,25 @@ def export_csv():
             data.seek(0)
             data.truncate(0)
             
-    return Response(generate(), mimetype='text/csv', headers={"Content-Disposition": "attachment; filename=mobatai_vault_backup.csv"})
+    # El archivo ahora tiene el nombre del usuario para no mezclar backups
+    filename = f"mobatai_vault_{session['username']}_backup.csv"
+    return Response(generate(), mimetype='text/csv', headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 # --- RUTAS PRINCIPALES ---
 @app.route('/dashboard/index')
 def index():
-    if not session.get('autorizado'):
+    if not session.get('user_id'):
         return redirect(url_for('login'))
         
-    todas_las_pelis = Movie.query.all()
+    # Trae SOLO las películas del dueño de la cuenta
+    todas_las_pelis = Movie.query.filter_by(user_id=session['user_id']).all()
     
-    # Separar Colección de Watchlist
     vistas = [p for p in todas_las_pelis if not p.is_watchlist]
     pendientes = [p for p in todas_las_pelis if p.is_watchlist]
     
     vistas.sort(key=lambda x: x.date_watched or '0000-00-00', reverse=True)
     pendientes.sort(key=lambda x: x.id, reverse=True)
     
-    # El promedio ignora los nulos y las abandonadas
     ratings = [p.rating for p in vistas if p.rating is not None and not p.abandoned]
     promedio = round(sum(ratings) / len(ratings)) if ratings else 0
     
@@ -118,7 +151,7 @@ def index():
 
 @app.route('/dashboard/form', methods=['GET', 'POST'])
 def form():
-    if not session.get('autorizado'):
+    if not session.get('user_id'):
         return redirect(url_for('login'))
         
     resultados = []
@@ -130,14 +163,13 @@ def form():
 
 @app.route('/dashboard/save', methods=['POST'])
 def save_movie():
-    if not session.get('autorizado'):
+    if not session.get('user_id'):
         return redirect(url_for('login'))
         
     tmdb_id = request.form.get('tmdb_id')
     title = request.form.get('title')
     poster_path = request.form.get('poster_path')
     
-    # Detectamos a dónde va y si la abandonó
     is_watchlist = request.form.get('action') == 'watchlist'
     abandoned = request.form.get('abandoned') == 'on'
     
@@ -148,7 +180,8 @@ def save_movie():
     platform = request.form.get('platform')
     opinion = request.form.get('opinion')
     
-    existe = Movie.query.filter_by(tmdb_id=tmdb_id).first()
+    # Comprueba que el usuario logueado no tenga ya esta película
+    existe = Movie.query.filter_by(tmdb_id=tmdb_id, user_id=session['user_id']).first()
     
     if not existe:
         details = get_movie_details(tmdb_id)
@@ -160,6 +193,7 @@ def save_movie():
         generos = ", ".join([g['name'] for g in generos_list])
 
         nueva_peli = Movie(
+            user_id=session['user_id'], # Asocia la peli al usuario creador
             tmdb_id=tmdb_id, title=title, poster_path=poster_path,
             rating=rating, platform=platform, opinion=opinion, date_watched=date_watched,
             director=director, genres=generos, cast=actores,
@@ -173,20 +207,22 @@ def save_movie():
 
 @app.route('/dashboard/delete/<int:id>', methods=['POST'])
 def delete_movie(id):
-    if not session.get('autorizado'):
+    if not session.get('user_id'):
         return redirect(url_for('login'))
         
-    pelicula = Movie.query.get_or_404(id)
+    # Busca la película asegurándose de que pertenece a este usuario
+    pelicula = Movie.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     db.session.delete(pelicula)
     db.session.commit()
     return redirect(url_for('index'))
 
 @app.route('/dashboard/edit/<int:id>', methods=['GET', 'POST'])
 def edit_movie(id):
-    if not session.get('autorizado'):
+    if not session.get('user_id'):
         return redirect(url_for('login'))
         
-    pelicula = Movie.query.get_or_404(id)
+    # Busca la película asegurándose de que pertenece a este usuario
+    pelicula = Movie.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     
     if request.method == 'POST':
         date_str = request.form.get('date_watched')
@@ -199,7 +235,6 @@ def edit_movie(id):
         
         pelicula.opinion = request.form.get('opinion')
         
-        # Actualizamos estado de watchlist y abandonada
         pelicula.abandoned = request.form.get('abandoned') == 'on'
         pelicula.is_watchlist = False 
         
