@@ -1,0 +1,171 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    .movie-card-container { transition: transform 0.3s ease; margin: 0 auto; }
+    .movie-card-container:hover { transform: translateY(-5px); }
+    .hover-info { opacity: 0; transition: opacity 0.3s ease; background: rgba(18, 18, 18, 0.95); }
+    .movie-card-container:hover .hover-info { opacity: 1; }
+    .loading-pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+    
+    /* Controles del carrusel más visibles */
+    .carousel-control-prev-icon, .carousel-control-next-icon {
+        background-color: rgba(0, 0, 0, 0.8);
+        border-radius: 50%;
+        padding: 20px;
+    }
+</style>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8 text-center">
+        <h2 class="fw-bold mb-4" style="color: var(--accent);">👁️ El Oráculo</h2>
+        <p class="text-muted mb-4">Descubriendo tu próxima obsesión cinematográfica.</p>
+        
+        <div id="initial-state">
+            <button id="btn-consultar" class="btn btn-accent btn-lg rounded-pill px-5 py-3 fw-bold shadow-lg">
+                Consultar al Oráculo
+            </button>
+        </div>
+
+        <div id="loading-state" class="d-none mt-5">
+            <div class="spinner-border text-info mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+            <h4 id="loading-text" class="loading-pulse" style="color: var(--accent);">Despertando al Oráculo...</h4>
+        </div>
+
+        <div id="results-state" class="mt-4 d-none">
+            <div id="oracleCarousel" class="carousel slide" data-bs-ride="false">
+                <div class="carousel-inner" id="carousel-content" style="padding: 20px 0;">
+                    </div>
+                
+                <button class="carousel-control-prev" type="button" data-bs-target="#oracleCarousel" data-bs-slide="prev" style="width: 10%;">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Anterior</span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#oracleCarousel" data-bs-slide="next" style="width: 10%;">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Siguiente</span>
+                </button>
+            </div>
+            
+            <button id="btn-reiniciar" class="btn btn-outline-info rounded-pill mt-4 mx-auto">
+                Consultar de nuevo
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const btnConsultar = document.getElementById('btn-consultar');
+    const btnReiniciar = document.getElementById('btn-reiniciar');
+    const initialState = document.getElementById('initial-state');
+    const loadingState = document.getElementById('loading-state');
+    const resultsState = document.getElementById('results-state');
+    const loadingText = document.getElementById('loading-text');
+
+    const frases = [
+        "Analizando tu historial de películas...",
+        "Buscando patrones en tus calificaciones...",
+        "Descartando géneros que abandonaste...",
+        "Cruzando datos con TMDB...",
+        "Preparando la revelación final..."
+    ];
+
+    btnReiniciar.addEventListener('click', () => location.reload());
+
+    // Función asíncrona para guardar en Watchlist
+    async function guardarEnWatchlist(tmdbId, titulo, poster, btnElement) {
+        btnElement.innerHTML = '⏳ Guardando...';
+        btnElement.disabled = true;
+        
+        try {
+            const res = await fetch("{{ url_for('oracle_add_watchlist') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tmdb_id: tmdbId, titulo: titulo, poster: poster })
+            });
+            const data = await res.json();
+            
+            if(data.success) {
+                btnElement.innerHTML = '✅ En Watchlist';
+                btnElement.classList.replace('btn-info', 'btn-success');
+            } else {
+                alert(data.error);
+                btnElement.innerHTML = '➕ Agregar a Watchlist';
+                btnElement.disabled = false;
+            }
+        } catch(e) {
+            alert('Error de conexión');
+            btnElement.innerHTML = '➕ Agregar a Watchlist';
+            btnElement.disabled = false;
+        }
+    }
+
+    btnConsultar.addEventListener('click', async () => {
+        initialState.classList.add('d-none');
+        loadingState.classList.remove('d-none');
+        
+        let fraseIndex = 0;
+        const fraseInterval = setInterval(() => {
+            fraseIndex = (fraseIndex + 1) % frases.length;
+            loadingText.innerText = frases[fraseIndex];
+        }, 2500);
+
+        try {
+            const response = await fetch("{{ url_for('oracle') }}", { method: 'POST' });
+            const data = await response.json();
+            
+            clearInterval(fraseInterval);
+            loadingState.classList.add('d-none');
+
+            if (data.error) {
+                document.getElementById('carousel-content').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                resultsState.classList.remove('d-none');
+                return;
+            }
+
+            document.getElementById('carousel-content').innerHTML = '';
+            
+            data.peliculas.forEach((peli, index) => {
+                const activeClass = index === 0 ? 'active' : '';
+                // Escapamos comillas simples en el título para el JS
+                const tituloSafe = peli.titulo.replace(/'/g, "\\'");
+                
+                const cardHtml = `
+                    <div class="carousel-item ${activeClass}">
+                        <div class="card form-section-card border-0 shadow-lg movie-card-container position-relative overflow-hidden" style="max-width: 380px;">
+                            <img src="${peli.poster}" class="card-img-top" alt="Poster" style="object-fit: cover; height: 500px;">
+                            
+                            <div class="hover-info position-absolute top-0 start-0 w-100 d-flex flex-column justify-content-center align-items-center p-4 text-white" style="height: 500px !important;">
+                                <h4 class="fw-bold text-center" style="color: var(--accent);">${peli.titulo} (${peli.fecha})</h4>
+                                <p class="small mb-4 text-center" style="font-size: 0.9rem; overflow-y: auto; max-height: 200px;">${peli.sinopsis}</p>
+                                
+                                <button class="btn btn-info rounded-pill fw-bold shadow-lg px-4" onclick="guardarEnWatchlist('${peli.tmdb_id}', '${tituloSafe}', '${peli.poster}', this)">
+                                    ➕ Agregar a Watchlist
+                                </button>
+                            </div>
+
+                            <div class="card-body bg-dark text-start">
+                                <h5 class="card-title fw-bold text-center">${peli.titulo}</h5>
+                                <hr class="border-secondary">
+                                <p class="card-text small text-muted">
+                                    <span style="color: var(--accent);">🔥 Por qué te gustará:</span><br>
+                                    ${peli.justificacion}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('carousel-content').innerHTML += cardHtml;
+            });
+            
+            resultsState.classList.remove('d-none');
+
+        } catch (error) {
+            clearInterval(fraseInterval);
+            loadingState.classList.add('d-none');
+            document.getElementById('carousel-content').innerHTML = `<div class="alert alert-danger">Error de conexión con el Oráculo.</div>`;
+            resultsState.classList.remove('d-none');
+        }
+    });
+</script>
+{% endblock %}

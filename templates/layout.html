@@ -33,6 +33,14 @@
         .card, .form-section-card { background-color: var(--bg-card) !important; border: 1px solid rgba(255, 255, 255, 0.05) !important; }
         .text-muted { color: var(--text-muted) !important; }
         .text-warning { color: var(--accent) !important; }
+        
+        /* Oculta la flechita por defecto del menú desplegable */
+        .hide-toggle::after { display: none !important; }
+        
+        /* Estilos para el menú desplegable oscuro */
+        .dropdown-menu-custom { background-color: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .dropdown-item { color: var(--text-main); transition: background 0.2s; }
+        .dropdown-item:hover { background-color: rgba(255, 255, 255, 0.05); color: var(--accent); }
     </style>
     <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }</script>
 </head>
@@ -44,12 +52,32 @@
             
             <div class="d-flex gap-2 align-items-center">
                 {% if session.get('username') %}
-                    <span class="text-light me-3 d-none d-md-inline" style="font-size: 0.85rem;">Hola, <b style="color: var(--accent);">{{ session['username'] }}</b></span>
+                    
+                    <a class="btn btn-outline-info btn-sm px-3 rounded-pill fw-bold shadow-sm" href="{{ url_for('oracle') }}">👁️ Oráculo</a>
+                    <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm" href="{{ url_for('form') }}">Nueva</a>
+                    
+                    <div class="nav-item dropdown ms-2" style="list-style: none;">
+                        <a class="nav-link dropdown-toggle hide-toggle d-flex align-items-center p-0" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none;">
+                            
+                            <div class="rounded-circle bg-info text-dark d-flex align-items-center justify-content-center fw-bold shadow" style="width: 40px; height: 40px; font-size: 1.1rem; border: 2px solid var(--accent);">
+                                {{ session.get('username', 'US')[:2] | upper }}
+                            </div>
+                        </a>
+                        
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-custom shadow-lg mt-3" aria-labelledby="userMenu">
+                            <li>
+                                <span class="dropdown-item-text text-info fw-bold border-bottom border-secondary pb-2 mb-2 d-block text-center">
+                                    Hola, {{ session.get('username') }}
+                                </span>
+                            </li>
+                            
+                            <li><a class="dropdown-item py-2" href="{{ url_for('export_csv') }}">📥 Exportar a CSV</a></li>
+                            <li><hr class="dropdown-divider border-secondary"></li>
+                            <li><a class="dropdown-item text-danger py-2 fw-bold" href="{{ url_for('logout') }}">🚪 Salir</a></li>
+                        </ul>
+                    </div>
+                    
                 {% endif %}
-                
-                <a class="btn btn-outline-secondary btn-sm rounded-pill border-secondary text-light" href="{{ url_for('export_csv') }}">Exportar</a>
-                <a class="btn btn-custom-outline btn-sm px-3 rounded-pill" href="{{ url_for('form') }}">Nueva</a>
-                <a class="text-muted text-decoration-none small hover-white ms-2" href="{{ url_for('logout') }}">Salir</a>
             </div>
             
         </div>

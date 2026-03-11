@@ -1,0 +1,26 @@
+id,tmdb_id,title,poster_path,is_watchlist,abandoned,rating,platform,opinion,date_watched,director,genres,cast,user_id
+1,1316092,“Cumbres Borrascosas”,/afGUJcMBJloAUp9uC27MQiqkD7X.jpg,0,0,70,Cine,Boludos los 2. Se murió por el egoísmo de ambos,2026-03-08,Emerald Fennell,"Romance, Drama","Margot Robbie, Jacob Elordi, Hong Chau",1
+2,1138194,Heretic,/rpo3DJFMOSAz27gDwxJ5LIwIFni.jpg,0,0,60,Amazon Prime,Esperaba más. La peli daba para mas,2026-01-07,Scott Beck,"Suspense, Terror","Hugh Grant, Sophie Thatcher, Chloe East",1
+3,10591,La vecina de al lado,/ad9tM1Zet4s8DVbFsAX4cYdkIPd.jpg,0,0,70,Disney+,Aprobada,2026-01-07,Luke Greenfield,"Comedia, Romance","Emile Hirsch, Elisha Cuthbert, Timothy Olyphant",1
+4,141,Donnie Darko,/1YjDHBC4v2O7IQDKYAiM8fOxzf3.jpg,0,0,55,Amazon Prime,No la entendí. Me dejó hasta el día de hoy recalculando sobre lo que ví,2026-01-07,Richard Kelly,"Fantasía, Drama, Misterio","Jake Gyllenhaal, Jena Malone, James Duval",1
+5,9481,El coleccionista de huesos,/rKJHQVzmFtmmGcdQPqShwAdvJ1G.jpg,0,0,66,HBO,Tiene mejores películas Denzel,2026-01-07,Phillip Noyce,"Crimen, Suspense, Drama, Misterio","Denzel Washington, Angelina Jolie, Queen Latifah",1
+6,65754,Millennium: Los hombres que no amaban a las mujeres,/13lnsvTZ6534dupLhVIkr0b83un.jpg,0,0,,Amazon Prime,,,David Fincher,"Suspense, Crimen, Misterio","Daniel Craig, Rooney Mara, Christopher Plummer",1
+7,27205,Origen,/tXQvtRWfkUUnWJAn2tN3jERIUG.jpg,0,0,,HBO,Muy buena. No me acuerdo para puntuarla,,Christopher Nolan,"Acción, Ciencia ficción, Aventura","Leonardo DiCaprio, Joseph Gordon-Levitt, Ken Watanabe",1
+8,11324,Shutter Island,/56utveUWJwmG12YU7c2zKw6pbRZ.jpg,0,0,,Netflix,,,Martin Scorsese,"Drama, Suspense, Misterio","Leonardo DiCaprio, Mark Ruffalo, Ben Kingsley",1
+9,157336,Interstellar,/fbUwSqYIP0isCiJXey3staY3DNn.jpg,0,0,,HBO,,,Christopher Nolan,"Aventura, Drama, Ciencia ficción","Matthew McConaughey, Anne Hathaway, Michael Caine",1
+10,278,Cadena perpetua,/uRRTV7p6l2ivtODWJVVAMRrwTn2.jpg,0,0,,HBO,,,Frank Darabont,"Drama, Crimen","Tim Robbins, Morgan Freeman, Bob Gunton",1
+11,146233,Prisioneros,/i6CcmOvJxBFH3mfhCHa3Njtelix.jpg,0,0,90,Magis,Espectacular y el final es un gol de mitad de cancha,2025-12-09,Denis Villeneuve,"Drama, Suspense, Crimen","Hugh Jackman, Jake Gyllenhaal, Viola Davis",1
+12,807,Seven,/uVPcVz4b2hnSGrXYLdIGRXwcivs.jpg,0,0,,HBO,,,David Fincher,"Crimen, Misterio, Suspense","Morgan Freeman, Brad Pitt, Gwyneth Paltrow",1
+13,1949,Zodiac,/gmoypdRU7rCJZZrZFKGirONbgrI.jpg,0,0,,HBO,,,David Fincher,"Crimen, Misterio, Suspense","Jake Gyllenhaal, Mark Ruffalo, Anthony Edwards",1
+15,9740,Hannibal,/v5wAZwRqpGWmyAaaJ8BBHYuNXnj.jpg,0,0,62,HBO,Bien para mirar un domingo enganchada en la tv pero no la elijo,2026-01-08,Ridley Scott,"Crimen, Drama, Suspense","Anthony Hopkins, Julianne Moore, Gary Oldman",1
+16,4148,Revolutionary Road,/ccUJy71VwfcO20mBeEPvm62bx1P.jpg,0,0,72,Stremio,La realidad de muchas parejas tóxicas,2026-01-09,Sam Mendes,"Drama, Romance","Leonardo DiCaprio, Kate Winslet, Kathy Bates",1
+17,4553,El maquinista,/2z6jtS2dVTbM73USNEewBh7kwX3.jpg,0,0,80,Stremio,No entendés nada durante toda la película y al final uff,2026-01-09,Brad Anderson,"Suspense, Drama","Christian Bale, Jennifer Jason Leigh, Aitana Sánchez-Gijón",1
+18,257211,El becario,/bpaq572AFnI4JtufuVqcRZrlDdz.jpg,0,0,71,HBO,Buena peli para Reirte un poco,2026-01-10,Nancy Meyers,Comedia,"Robert De Niro, Anne Hathaway, Rene Russo",1
+19,401981,Gorrión rojo,/jwztj1bUvAJDmO7mArASmkbPPKd.jpg,0,0,67,Disney+,Buen final. Inesperado pero es una más del montón,2026-01-10,Francis Lawrence,"Suspense, Misterio","Jennifer Lawrence, Joel Edgerton, Matthias Schoenaerts",1
+20,1034716,Gente que conocemos en vacaciones,/9SUEbyc5OUaNkGPLK3f1w3Ryoyo.jpg,0,0,64,Netflix,La amistad entre el hombre y la mujer no existe,2026-01-13,Brett Haley,"Romance, Comedia, Drama","Emily Bader, Tom Blyth, Sarah Catherine Hook",1
+21,322,Mystic River,/b6j7T4uBjXdG8FBMuDFsHttgIK2.jpg,0,0,83,HBO,Me atrapó todo el tiempo. Sin saber quién era el asesino,2026-03-07,Clint Eastwood,"Suspense, Crimen, Drama, Misterio","Sean Penn, Tim Robbins, Kevin Bacon",1
+22,1124,El truco final (El prestigio),/lIl2CrnWohGrZSO9eyKRptxZ7Hs.jpg,0,0,85,HBO,Excelente ejemplo de como la competencia puede destruir a 2 personas,2026-03-08,Christopher Nolan,"Drama, Misterio, Ciencia ficción","Hugh Jackman, Christian Bale, Michael Caine",1
+23,210577,Perdida,/bkIhygnbv9ydlDo4SEsOcqGgQD4.jpg,0,0,,Disney+,,,David Fincher,"Misterio, Suspense, Drama","Ben Affleck, Rosamund Pike, Neil Patrick Harris",1
+24,77,Memento,/neHrQLVfT3KPqvv30pNPyRb6chQ.jpg,1,0,,Magis,,,Christopher Nolan,"Misterio, Suspense","Guy Pearce, Carrie-Anne Moss, Joe Pantoliano",1
+25,274,El silencio de los corderos,/8FdQQ3cUCs9goEOr1qUFaHackoJ.jpg,0,0,74,Netflix,,2026-01-08,Jonathan Demme,"Crimen, Suspense, Drama","Jodie Foster, Anthony Hopkins, Scott Glenn",1
+26,242582,Nightcrawler,/lhwHd76JCkpCT8TRn4rUtToPEKL.jpg,1,0,,,,,Dan Gilroy,"Crimen, Drama, Suspense","Jake Gyllenhaal, Riz Ahmed, Rene Russo",1

@@ -1,10 +1,14 @@
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, Response
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, Response, jsonify
 from models import db, Movie, User
 from tmdb_helper import search_movie, get_movie_details
 import os
 import csv
 from io import StringIO
 from dotenv import load_dotenv
+from google import genai
+import json
+import requests
+
 
 load_dotenv()
 
@@ -242,6 +246,121 @@ def edit_movie(id):
         return redirect(url_for('index'))
         
     return render_template('edit.html', peli=pelicula)
+
+@app.route('/dashboard/oracle', methods=['GET', 'POST'])
+def oracle():
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+        
+    # Si solo entra a la página, mostramos el botón
+    if request.method == 'GET':
+        return render_template('oracle.html')
+        
+    # --- LOGICA DEL POST (CUANDO TOCA EL BOTON) ---
+    mis_pelis = Movie.query.filter_by(user_id=session['user_id']).all()
+    
+    if len(mis_pelis) < 3:
+        return jsonify({'error': "El Oráculo necesita más datos. Agregá al menos 3 películas a tu bóveda."})
+        
+    historial = []
+    for p in mis_pelis:
+        estado = "Abandonada" if p.abandoned else f"Puntaje: {p.rating}/100" if p.rating else "Vista"
+        historial.append(f"'{p.title}' ({estado})")
+            
+    reporte_peliculas = ", ".join(historial)
+    
+    # FORZAMOS A LA IA A DEVOLVER JSON PURO
+    prompt = f"""
+    Eres 'El Oráculo', un experto cinéfilo. Analiza mi historial: {reporte_peliculas}.
+    Recomiéndame 3 películas que NO estén en esta lista.
+    Devuelve ÚNICAMENTE un arreglo JSON válido con esta estructura exacta, sin texto adicional ni formato markdown:
+    [
+        {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué me va a gustar..."}}
+    ]
+    """
+    
+    try:
+        client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
+        response = client.models.generate_content(
+            model='gemini-2.5-flash', 
+            contents=prompt
+        )
+        
+        # Limpiamos por si Gemini manda comillas invertidas de código
+        texto_limpio = response.text.strip()
+        if texto_limpio.startswith("```json"):
+            texto_limpio = texto_limpio[7:-3].strip()
+        elif texto_limpio.startswith("```"):
+            texto_limpio = texto_limpio[3:-3].strip()
+            
+        recomendaciones = json.loads(texto_limpio)
+        
+        # ENRIQUECER CON TMDB
+        tmdb_api_key = os.getenv('TMDB_API_KEY')
+        resultados_finales = []
+        
+        for rec in recomendaciones:
+            # URL limpia 1: Búsqueda
+            search_url = f"https://api.themoviedb.org/3/search/movie?api_key={tmdb_api_key}&query={rec['titulo']}&year={rec['anio']}&language=es-ES"
+            tmdb_res = requests.get(search_url).json()
+            
+            if tmdb_res.get('results'):
+                peli = tmdb_res['results'][0]
+                resultados_finales.append({
+                    'titulo': peli.get('title'),
+                    # URL limpia 2 y 3: Pósters
+                    'poster': f"https://image.tmdb.org/t/p/w500{peli['poster_path']}" if peli.get('poster_path') else 'https://via.placeholder.com/500x750?text=Sin+Poster',
+                    'sinopsis': peli.get('overview', 'Sin descripción disponible.'),
+                    'fecha': peli.get('release_date', '').split('-')[0] if peli.get('release_date') else rec['anio'],
+                    'justificacion': rec['justificacion'],
+                    'tmdb_id': peli['id']
+                })
+            else:
+                resultados_finales.append({
+                    'titulo': rec['titulo'],
+                    # URL limpia 4: Póster de respaldo
+                    'poster': 'https://via.placeholder.com/500x750?text=Sin+Poster',
+                    'sinopsis': 'Detalles no encontrados en TMDB.',
+                    'fecha': rec['anio'],
+                    'justificacion': rec['justificacion'],
+                    'tmdb_id': ''
+                })
+                
+        return jsonify({'success': True, 'peliculas': resultados_finales})
+        
+    except Exception as e:
+        return jsonify({'error': f"Fallo en la conexión neural: {str(e)}"})
+    
+@app.route('/dashboard/oracle/add_watchlist', methods=['POST'])
+def oracle_add_watchlist():
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'error': 'Sesión expirada'})
+        
+    data = request.json
+    tmdb_id = data.get('tmdb_id')
+    titulo = data.get('titulo')
+    poster = data.get('poster')
+    
+    # 1. Verificamos que no la tengas ya en la bóveda
+    existe = Movie.query.filter_by(user_id=session['user_id'], tmdb_id=tmdb_id).first()
+    if existe:
+        return jsonify({'success': False, 'error': 'Ya está en tu colección'})
+        
+    # 2. La guardamos directo en la Watchlist
+    try:
+        nueva_peli = Movie(
+            user_id=session['user_id'],
+            tmdb_id=tmdb_id,
+            title=titulo,
+            poster_path=poster.replace('https://image.tmdb.org/t/p/w500', '') if 'tmdb.org' in poster else None,
+            is_watchlist=True,
+            abandoned=False
+        )
+        db.session.add(nueva_peli)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)
