@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, Response, jsonify
 from models import db, Movie, User
-from tmdb_helper import search_movie, get_movie_details
+from tmdb_helper import search_movie, get_movie_details, get_imdb_rating
 import os
 import csv
 from io import StringIO
@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 from google import genai
 import json
 import requests
-
 
 load_dotenv()
 
@@ -105,7 +104,7 @@ def export_csv():
     def generate():
         data = StringIO()
         writer = csv.writer(data)
-        writer.writerow(['ID', 'Titulo', 'Estado', 'Fecha Vista', 'Plataforma', 'Puntaje', 'Opinion', 'Director', 'Generos'])
+        writer.writerow(['ID', 'Titulo', 'Estado', 'Fecha Vista', 'Plataforma', 'Puntaje Vault', 'Puntaje IMDb', 'Opinion', 'Director', 'Generos'])
         yield data.getvalue()
         data.seek(0)
         data.truncate(0)
@@ -114,7 +113,7 @@ def export_csv():
             estado = 'Watchlist' if p.is_watchlist else ('Abandonada' if p.abandoned else 'Colección')
             writer.writerow([
                 p.tmdb_id, p.title, estado, p.date_watched or 'N/A', 
-                p.platform or 'N/A', p.rating or 'N/A', 
+                p.platform or 'N/A', p.rating or 'N/A', p.imdb_score or 'N/A',
                 p.opinion or '', p.director, p.genres
             ])
             yield data.getvalue()
@@ -189,18 +188,31 @@ def save_movie():
     
     if not existe:
         details = get_movie_details(tmdb_id)
-        crew = details.get('credits', {}).get('crew', []) if details else []
-        director = next((c['name'] for c in crew if c['job'] == 'Director'), 'Desconocido')
-        cast = details.get('credits', {}).get('cast', []) if details else []
-        actores = ", ".join([a['name'] for a in cast[:3]])
-        generos_list = details.get('genres', []) if details else []
-        generos = ", ".join([g['name'] for g in generos_list])
+        director = 'Desconocido'
+        actores = ''
+        generos = ''
+        imdb_score = None
+        
+        if details:
+            crew = details.get('credits', {}).get('crew', [])
+            director = next((c['name'] for c in crew if c['job'] == 'Director'), 'Desconocido')
+            
+            cast = details.get('credits', {}).get('cast', [])
+            actores = ", ".join([a['name'] for a in cast[:3]])
+            
+            generos_list = details.get('genres', [])
+            generos = ", ".join([g['name'] for g in generos_list])
+            
+            # MAGIA IMDB: Traemos el código de IMDb y buscamos el puntaje
+            imdb_id = details.get('imdb_id')
+            if imdb_id:
+                imdb_score = get_imdb_rating(imdb_id)
 
         nueva_peli = Movie(
             user_id=session['user_id'], # Asocia la peli al usuario creador
             tmdb_id=tmdb_id, title=title, poster_path=poster_path,
             rating=rating, platform=platform, opinion=opinion, date_watched=date_watched,
-            director=director, genres=generos, cast=actores,
+            director=director, genres=generos, cast=actores, imdb_score=imdb_score,
             is_watchlist=is_watchlist,
             abandoned=abandoned
         )
@@ -241,6 +253,8 @@ def edit_movie(id):
         
         pelicula.abandoned = request.form.get('abandoned') == 'on'
         pelicula.is_watchlist = False 
+        
+        pelicula.imdb_score = request.form.get('imdb_score')
         
         db.session.commit()
         return redirect(url_for('index'))
@@ -353,12 +367,13 @@ def oracle_add_watchlist():
     if existe:
         return jsonify({'success': False, 'error': 'Ya está en tu colección'})
         
-    # 2. Vamos a TMDB a buscar la data completa (Director, Cast, Géneros)
+    # 2. Vamos a TMDB a buscar la data completa (Director, Cast, Géneros y ahora IMDb)
     try:
         details = get_movie_details(tmdb_id)
         director = 'Desconocido'
         actores = ''
         generos = ''
+        imdb_score = None
         
         if details:
             crew = details.get('credits', {}).get('crew', [])
@@ -369,6 +384,10 @@ def oracle_add_watchlist():
             
             generos_list = details.get('genres', [])
             generos = ", ".join([g['name'] for g in generos_list])
+            
+            imdb_id = details.get('imdb_id')
+            if imdb_id:
+                imdb_score = get_imdb_rating(imdb_id)
 
         # 3. La guardamos en la Watchlist con TODOS los datos
         nueva_peli = Movie(
@@ -379,6 +398,7 @@ def oracle_add_watchlist():
             director=director,
             cast=actores,
             genres=generos,
+            imdb_score=imdb_score,
             is_watchlist=True,
             abandoned=False
         )

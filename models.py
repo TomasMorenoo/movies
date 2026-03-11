@@ -20,7 +20,7 @@ class User(db.Model):
 class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     
-    # NUEVO: ID del usuario dueño de esta película
+    # ID del usuario dueño de esta película
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     
     tmdb_id = db.Column(db.Integer, nullable=False)
@@ -38,6 +38,9 @@ class Movie(db.Model):
     director = db.Column(db.String(100), nullable=True)
     genres = db.Column(db.String(200), nullable=True)
     cast = db.Column(db.String(300), nullable=True)
+    
+    # NUEVO: Puntaje de IMDb
+    imdb_score = db.Column(db.String(10), nullable=True)
 
     def __repr__(self):
         return f'<Movie {self.title}>'

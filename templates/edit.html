@@ -43,9 +43,15 @@
                     </div>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label text-muted small fw-bold">PUNTAJE (0-100)</label>
-                    <input type="number" name="rating" id="inputPuntaje" class="form-control" min="0" max="100" placeholder="Vacío = Ver de nuevo" value="{{ peli.rating if peli.rating != None else '' }}" {% if peli.abandoned %}disabled{% endif %}>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small fw-bold">PUNTAJE (0-100)</label>
+                        <input type="number" name="rating" id="inputPuntaje" class="form-control" min="0" max="100" placeholder="Vacío = Ver de nuevo" value="{{ peli.rating if peli.rating != None else '' }}" {% if peli.abandoned %}disabled{% endif %}>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small fw-bold">PUNTAJE IMDb</label>
+                        <input type="text" name="imdb_score" class="form-control" placeholder="Ej: 8.5" value="{{ peli.imdb_score or '' }}">
+                    </div>
                 </div>
 
                 <div class="mb-4">

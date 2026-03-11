@@ -109,16 +109,23 @@
 
                     <div class="movie-info-overlay text-center">
                         <h6 class="fw-bold mb-2" style="color: var(--accent);">{{ movie.title }}</h6>
+                        
+                        {% if movie.imdb_score %}
+                        <p class="mb-1 fw-bold" style="font-size: 0.8rem; color: #f5c518; letter-spacing: 0.5px;">IMDb ⭐ {{ movie.imdb_score }}</p>
+                        {% endif %}
+                        
                         <p class="mb-1" style="font-size: 0.75rem;"><strong>Dir:</strong> {{ movie.director }}</p>
                         <p class="mb-2" style="font-size: 0.7rem;"><strong>Cast:</strong> {{ movie.cast }}</p>
                         <hr class="border-light opacity-25 my-1">
                         <p class="mb-1 mt-1" style="font-size: 0.75rem;"><strong>Plataforma:</strong> {{ movie.platform or 'N/A' }}</p>
                         <p class="mb-1" style="font-size: 0.75rem;"><strong>Fecha:</strong> {{ movie.date_watched or ('Abandonada' if movie.abandoned else 'Hace mucho') }}</p>
+                        
                         {% if movie.opinion %}
                         <div class="mt-2 p-2 rounded" style="background: rgba(255,255,255,0.05);">
                             <p class="m-0 fst-italic opinion-scroll">"{{ movie.opinion }}"</p>
                         </div>
                         {% endif %}
+                        
                         <div class="mt-auto pt-3 d-flex gap-2">
                             <a href="{{ url_for('edit_movie', id=movie.id) }}" class="btn btn-outline-light btn-sm w-50 rounded-pill" style="font-size: 0.75rem;">Editar</a>
                             <form action="{{ url_for('delete_movie', id=movie.id) }}" method="POST" class="w-50" onsubmit="return confirm('¿Borrar película?');">
@@ -145,8 +152,14 @@
                     <span class="badge bg-info text-dark badge-score shadow" style="font-size: 0.85rem; padding: 5px 10px;">📌 Pendiente</span>
                     <div class="movie-info-overlay text-center d-flex flex-column justify-content-center">
                         <h6 class="fw-bold mb-2 text-info">{{ movie.title }}</h6>
+                        
+                        {% if movie.imdb_score %}
+                        <p class="mb-1 fw-bold" style="font-size: 0.8rem; color: #f5c518; letter-spacing: 0.5px;">IMDb ⭐ {{ movie.imdb_score }}</p>
+                        {% endif %}
+                        
                         <p class="mb-1" style="font-size: 0.75rem;"><strong>Dir:</strong> {{ movie.director }}</p>
                         <p class="mb-2" style="font-size: 0.7rem;"><strong>Cast:</strong> {{ movie.cast }}</p>
+                        
                         <div class="mt-auto pt-3 d-flex gap-2">
                             <a href="{{ url_for('edit_movie', id=movie.id) }}" class="btn btn-info btn-sm w-50 rounded-pill text-dark fw-bold" style="font-size: 0.75rem;">Ya la vi</a>
                             <form action="{{ url_for('delete_movie', id=movie.id) }}" method="POST" class="w-50" onsubmit="return confirm('¿Quitar de la lista?');">
