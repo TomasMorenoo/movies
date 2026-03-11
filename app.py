@@ -353,13 +353,32 @@ def oracle_add_watchlist():
     if existe:
         return jsonify({'success': False, 'error': 'Ya está en tu colección'})
         
-    # 2. La guardamos directo en la Watchlist
+    # 2. Vamos a TMDB a buscar la data completa (Director, Cast, Géneros)
     try:
+        details = get_movie_details(tmdb_id)
+        director = 'Desconocido'
+        actores = ''
+        generos = ''
+        
+        if details:
+            crew = details.get('credits', {}).get('crew', [])
+            director = next((c['name'] for c in crew if c['job'] == 'Director'), 'Desconocido')
+            
+            cast = details.get('credits', {}).get('cast', [])
+            actores = ", ".join([a['name'] for a in cast[:3]])
+            
+            generos_list = details.get('genres', [])
+            generos = ", ".join([g['name'] for g in generos_list])
+
+        # 3. La guardamos en la Watchlist con TODOS los datos
         nueva_peli = Movie(
             user_id=session['user_id'],
             tmdb_id=tmdb_id,
             title=titulo,
             poster_path=poster.replace('https://image.tmdb.org/t/p/w500', '') if 'tmdb.org' in poster else None,
+            director=director,
+            cast=actores,
+            genres=generos,
             is_watchlist=True,
             abandoned=False
         )

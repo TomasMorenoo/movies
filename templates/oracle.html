@@ -13,17 +13,18 @@
     @media (max-width: 767px) {
         .mobile-scroll-container {
             display: flex;
-            flex-wrap: nowrap; /* <-- ESTA ES LA LÍNEA QUE FALTABA */
+            flex-wrap: nowrap;
             overflow-x: auto;
-            scroll-snap-type: x mandatory;
+            scroll-snap-type: x mandatory; /* Volvemos a mandatory para centrado perfecto */
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
             padding-bottom: 15px;
         }
-        .mobile-scroll-container::-webkit-scrollbar { display: none; } /* Oculta la barra fea */
+        .mobile-scroll-container::-webkit-scrollbar { display: none; } 
         .mobile-scroll-container > .col-md-4 {
             flex: 0 0 100%;
             scroll-snap-align: center;
+            scroll-snap-stop: always; /* <-- ESTA ES LA MAGIA: Obliga a frenar en cada carta */
         }
         .swipe-indicator { 
             display: block; 
@@ -37,8 +38,10 @@
 
 <div class="row justify-content-center">
     <div class="col-lg-10 text-center">
-        <h2 class="fw-bold mb-4" style="color: var(--accent);">👁️ El Oráculo</h2>
-        <p class="text-muted mb-4">Descubriendo tu próxima obsesión cinematográfica.</p>
+        <div id="header-text">
+            <h2 class="fw-bold mb-4" style="color: var(--accent);">👁️ El Oráculo</h2>
+            <p class="text-muted mb-4">Descubriendo tu próxima obsesión cinematográfica.</p>
+        </div>
         
         <div id="initial-state">
             <button id="btn-consultar" class="btn btn-accent btn-lg rounded-pill px-5 py-3 fw-bold shadow-lg">
@@ -124,6 +127,9 @@
             
             clearInterval(fraseInterval);
             loadingState.classList.add('d-none');
+            
+            // Ocultamos el título principal para limpiar la pantalla
+            document.getElementById('header-text').classList.add('d-none');
 
             if (data.error) {
                 document.getElementById('carousel-content').innerHTML = `<div class="alert alert-danger w-100 text-center">${data.error}</div>`;
@@ -151,7 +157,7 @@
                             </div>
 
                             <div class="card-body bg-dark text-start d-flex flex-column">
-                                <h5 class="card-title fw-bold text-center">${peli.titulo}</h5>
+                                <h5 class="card-title fw-bold text-center text-white">${peli.titulo}</h5>
                                 <hr class="border-secondary">
                                 <p class="card-text small text-muted flex-grow-1">
                                     <span style="color: var(--accent);">🔥 Por qué te gustará:</span><br>

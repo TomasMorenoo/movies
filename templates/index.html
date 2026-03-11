@@ -13,6 +13,18 @@
     .nav-tabs .nav-link { color: var(--text-muted); border: none; }
     .nav-tabs .nav-link.active { color: var(--accent) !important; background: transparent; border-bottom: 2px solid var(--accent); }
     .movie-card:hover .badge-score, .movie-card.touch-active .badge-score { opacity: 0; }
+    
+    /* Scroll personalizado para la opinión */
+    .opinion-scroll {
+        max-height: 65px; /* Aprox 4 renglones */
+        overflow-y: auto;
+        text-align: left;
+        padding-right: 5px;
+        font-size: 0.75rem;
+    }
+    .opinion-scroll::-webkit-scrollbar { width: 4px; }
+    .opinion-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+    .opinion-scroll::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
 </style>
 
 <div class="row mb-4 px-2">
@@ -80,7 +92,7 @@
                     {% elif movie.rating != None %}
                         {% set bg_color = '#FF1744' %}{% set text_color = 'white' %}
                         {% if movie.rating == 100 %}{% set bg_color = 'var(--accent)' %}{% set text_color = 'black' %}
-                        {% elif movie.rating >= 90 %}{% set bg_color = '#FFD700' %}{% set text_color = 'black' %}
+                        {% elif movie.rating >= 90 %}{% set bg_color = '#9D00FF' %}{% set text_color = 'white' %}
                         {% elif movie.rating >= 75 %}{% set bg_color = '#00E676' %}{% set text_color = 'black' %}
                         {% elif movie.rating >= 55 %}{% set bg_color = '#FFEA00' %}{% set text_color = 'black' %}
                         {% elif movie.rating >= 35 %}{% set bg_color = '#FF9100' %}{% set text_color = 'black' %}{% endif %}
@@ -104,7 +116,7 @@
                         <p class="mb-1" style="font-size: 0.75rem;"><strong>Fecha:</strong> {{ movie.date_watched or ('Abandonada' if movie.abandoned else 'Hace mucho') }}</p>
                         {% if movie.opinion %}
                         <div class="mt-2 p-2 rounded" style="background: rgba(255,255,255,0.05);">
-                            <p class="m-0 fst-italic text-truncate" style="font-size: 0.7rem;">"{{ movie.opinion }}"</p>
+                            <p class="m-0 fst-italic opinion-scroll">"{{ movie.opinion }}"</p>
                         </div>
                         {% endif %}
                         <div class="mt-auto pt-3 d-flex gap-2">
