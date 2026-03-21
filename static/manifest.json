@@ -1,12 +1,20 @@
 {
+  "id": "/mobatai-vault-app/",
   "name": "Mobatai Vault",
   "short_name": "Mobatai",
+  "description": "Gestión de películas y entretenimiento",
   "start_url": "/dashboard/index",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#00E5FF",
   "orientation": "portrait",
   "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3658/3658959.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3658/3658959.png",
       "sizes": "512x512",
