@@ -13,19 +13,16 @@
     .nav-tabs .nav-link { color: var(--text-muted); border: none; }
     .nav-tabs .nav-link.active { color: var(--accent) !important; background: transparent; border-bottom: 2px solid var(--accent); }
     .movie-card:hover .badge-score, .movie-card.touch-active .badge-score { opacity: 0; }
-    
-    /* Scroll personalizado para la opinión */
-    .opinion-scroll {
-        max-height: 65px; /* Aprox 4 renglones */
-        overflow-y: auto;
-        text-align: left;
-        padding-right: 5px;
-        font-size: 0.75rem;
-    }
+    .opinion-scroll { max-height: 65px; overflow-y: auto; text-align: left; padding-right: 5px; font-size: 0.75rem; }
     .opinion-scroll::-webkit-scrollbar { width: 4px; }
     .opinion-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
     .opinion-scroll::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+    /* Buscador activo en todas las tabs */
+    .search-active-hint { font-size: 0.72rem; color: var(--accent); display: none; margin-top: 4px; }
+    .search-active-hint.visible { display: block; }
 </style>
+
+{# volver_a_ver se calcula en el loop directamente #}
 
 <div class="row mb-4 px-2">
     <div class="col-4 px-1">
@@ -48,10 +45,11 @@
     </div>
 </div>
 
-<div class="controls-container mb-4 shadow-sm">
+<div class="controls-container mb-3 shadow-sm">
     <div class="row g-2">
         <div class="col-md-8">
-            <input type="text" id="liveSearch" class="form-control search-input" placeholder="🔍 Buscar película en tu Vault...">
+            <input type="text" id="liveSearch" class="form-control search-input" placeholder="🔍 Buscar en toda tu bóveda...">
+            <div class="search-active-hint" id="searchHint">Buscando en todas las secciones</div>
         </div>
         <div class="col-md-4">
             <select id="sortSelect" class="form-select">
@@ -66,25 +64,48 @@
 
 <ul class="nav nav-tabs mb-4 border-secondary" id="myTab" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active fw-bold" id="coleccion-tab" data-bs-toggle="tab" data-bs-target="#coleccion" type="button" role="tab">Mi Colección</button>
+        <button class="nav-link active fw-bold" id="coleccion-tab" data-bs-toggle="tab" data-bs-target="#coleccion" type="button" role="tab">
+            Mi Colección
+        </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link fw-bold" id="watchlist-tab" data-bs-toggle="tab" data-bs-target="#watchlist" type="button" role="tab">Watchlist ({{ pendientes|length }})</button>
+        {% set n_volver = namespace(value=0) %}{% for p in peliculas %}{% if p.rating == None and not p.abandoned %}{% set n_volver.value = n_volver.value + 1 %}{% endif %}{% endfor %}
+        <button class="nav-link fw-bold" id="volver-tab" data-bs-toggle="tab" data-bs-target="#volver" type="button" role="tab">
+            Volver a ver
+            {% if n_volver.value > 0 %}<span class="badge bg-secondary rounded-pill ms-1" style="font-size:0.65rem;">{{ n_volver.value }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold" id="watchlist-tab" data-bs-toggle="tab" data-bs-target="#watchlist" type="button" role="tab">
+            Watchlist <span class="badge bg-secondary rounded-pill ms-1" style="font-size:0.65rem;">{{ pendientes|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        {% set n_aband = namespace(value=0) %}{% for p in peliculas %}{% if p.abandoned %}{% set n_aband.value = n_aband.value + 1 %}{% endif %}{% endfor %}
+        <button class="nav-link fw-bold" id="abandonadas-tab" data-bs-toggle="tab" data-bs-target="#abandonadas" type="button" role="tab">
+            Abandonadas
+            {% if n_aband.value > 0 %}<span class="badge bg-secondary rounded-pill ms-1" style="font-size:0.65rem;">{{ n_aband.value }}</span>{% endif %}
+        </button>
     </li>
 </ul>
 
 <div class="tab-content" id="myTabContent">
+
+    <!-- ======================== COLECCIÓN ======================== -->
     <div class="tab-pane fade show active" id="coleccion" role="tabpanel">
         <div class="row" id="moviesGrid">
-            {% for movie in peliculas %}
-            <div class="col-6 col-md-3 mb-4 movie-item" data-title="{{ movie.title | lower }}" data-date="{{ movie.date_watched or '0000-00-00' }}" data-score="{{ movie.rating if movie.rating != None else (-2 if movie.abandoned else -1) }}">
+            {% for movie in peliculas if movie.rating != None and not movie.abandoned %}
+            <div class="col-6 col-md-3 mb-4 movie-item all-item"
+                 data-title="{{ movie.title | lower }}"
+                 data-date="{{ movie.date_watched or '0000-00-00' }}"
+                 data-score="{{ movie.rating if movie.rating != None else (-2 if movie.abandoned else -1) }}">
                 <div class="card h-100 movie-card shadow-lg" onclick="this.classList.toggle('touch-active')">
                     {% if movie.poster_path %}
                     <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" class="card-img-top h-100 object-fit-cover" loading="lazy">
                     {% else %}
                     <div class="card-img-top bg-secondary text-white d-flex align-items-center justify-content-center" style="height: 300px;">Sin Imagen</div>
                     {% endif %}
-                    
+
                     {% if movie.abandoned %}
                         <div class="badge-score d-flex rounded overflow-hidden shadow border border-danger">
                             <div class="bg-dark text-danger px-2 py-1 fw-bold" style="font-size: 0.8rem;">❌ Abandonada</div>
@@ -96,36 +117,25 @@
                         {% elif movie.rating >= 75 %}{% set bg_color = '#00E676' %}{% set text_color = 'black' %}
                         {% elif movie.rating >= 55 %}{% set bg_color = '#FFEA00' %}{% set text_color = 'black' %}
                         {% elif movie.rating >= 35 %}{% set bg_color = '#FF9100' %}{% set text_color = 'black' %}{% endif %}
-                        
                         <div class="badge-score d-flex rounded overflow-hidden shadow" style="border: 1px solid rgba(0,0,0,0.8);">
                             <div class="bg-dark text-light px-2 py-1 d-flex align-items-center" style="font-size: 0.85rem;">★</div>
                             <div class="px-2 py-1 fw-bold d-flex align-items-center" style="background-color: {{ bg_color }}; color: {{ text_color }}; font-size: 0.85rem;">{{ movie.rating }}</div>
-                        </div>
-                    {% else %}
-                        <div class="badge-score d-flex rounded overflow-hidden shadow border border-secondary">
-                            <div class="bg-dark text-light px-2 py-1 fw-bold" style="font-size: 0.8rem;">🔄 Ver de nuevo</div>
                         </div>
                     {% endif %}
 
                     <div class="movie-info-overlay text-center">
                         <h6 class="fw-bold mb-2" style="color: var(--accent);">{{ movie.title }}</h6>
-                        
-                        {% if movie.imdb_score %}
-                        <p class="mb-1 fw-bold" style="font-size: 0.8rem; color: #f5c518; letter-spacing: 0.5px;">IMDb ⭐ {{ movie.imdb_score }}</p>
-                        {% endif %}
-                        
+                        {% if movie.imdb_score %}<p class="mb-1 fw-bold" style="font-size: 0.8rem; color: #f5c518;">IMDb ⭐ {{ movie.imdb_score }}</p>{% endif %}
                         <p class="mb-1" style="font-size: 0.75rem;"><strong>Dir:</strong> {{ movie.director }}</p>
                         <p class="mb-2" style="font-size: 0.7rem;"><strong>Cast:</strong> {{ movie.cast }}</p>
                         <hr class="border-light opacity-25 my-1">
                         <p class="mb-1 mt-1" style="font-size: 0.75rem;"><strong>Plataforma:</strong> {{ movie.platform or 'N/A' }}</p>
-                        <p class="mb-1" style="font-size: 0.75rem;"><strong>Fecha:</strong> {{ movie.date_watched or ('Abandonada' if movie.abandoned else 'Hace mucho') }}</p>
-                        
+                        <p class="mb-1" style="font-size: 0.75rem;"><strong>Fecha:</strong> {{ movie.date_watched or ('Abandonada' if movie.abandoned else 'N/A') }}</p>
                         {% if movie.opinion %}
                         <div class="mt-2 p-2 rounded" style="background: rgba(255,255,255,0.05);">
                             <p class="m-0 fst-italic opinion-scroll">"{{ movie.opinion }}"</p>
                         </div>
                         {% endif %}
-                        
                         <div class="mt-auto pt-3 d-flex gap-2">
                             <a href="{{ url_for('edit_movie', id=movie.id) }}" class="btn btn-outline-light btn-sm w-50 rounded-pill" style="font-size: 0.75rem;">Editar</a>
                             <form action="{{ url_for('delete_movie', id=movie.id) }}" method="POST" class="w-50" onsubmit="return confirm('¿Borrar película?');">
@@ -136,15 +146,62 @@
                 </div>
             </div>
             {% else %}
-            <div class="col-12"><div class="alert text-center border" style="background-color: var(--bg-card); color: var(--text-muted); border-color: rgba(255,255,255,0.1)!important;">Aún no hay películas en Mobatai Vault.</div></div>
+            <div class="col-12"><div class="alert text-center border" style="background-color: var(--bg-card); color: var(--text-muted); border-color: rgba(255,255,255,0.1)!important;">Aún no hay películas calificadas en Mobatai Vault.</div></div>
             {% endfor %}
         </div>
     </div>
 
+    <!-- ======================== VOLVER A VER ======================== -->
+    <div class="tab-pane fade" id="volver" role="tabpanel">
+        <div class="row" id="volverGrid">
+            {% set hay_volver = namespace(value=false) %}
+            {% for movie in peliculas %}
+            {% if movie.rating == None and not movie.abandoned %}
+            {% set hay_volver.value = true %}
+            <div class="col-6 col-md-3 mb-4 volver-item all-item" data-title="{{ movie.title | lower }}" data-date="{{ movie.date_watched or '0000-00-00' }}" data-score="-1">
+                <div class="card h-100 movie-card shadow-lg" onclick="this.classList.toggle('touch-active')">
+                    {% if movie.poster_path %}
+                    <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" class="card-img-top h-100 object-fit-cover" loading="lazy">
+                    {% else %}
+                    <div class="card-img-top bg-secondary text-white d-flex align-items-center justify-content-center" style="height: 300px;">Sin Imagen</div>
+                    {% endif %}
+                    <div class="badge-score d-flex rounded overflow-hidden shadow" style="border: 1px solid #00E676;">
+                        <div class="bg-dark px-2 py-1 fw-bold" style="font-size: 0.8rem; color: #00E676;">🔄 Ver de nuevo</div>
+                    </div>
+                    <div class="movie-info-overlay text-center">
+                        <h6 class="fw-bold mb-2" style="color: #00E676;">{{ movie.title }}</h6>
+                        {% if movie.imdb_score %}<p class="mb-1 fw-bold" style="font-size: 0.8rem; color: #f5c518;">IMDb ⭐ {{ movie.imdb_score }}</p>{% endif %}
+                        <p class="mb-1" style="font-size: 0.75rem;"><strong>Dir:</strong> {{ movie.director }}</p>
+                        <p class="mb-2" style="font-size: 0.7rem;"><strong>Cast:</strong> {{ movie.cast }}</p>
+                        <hr class="border-light opacity-25 my-1">
+                        <p class="mb-1 mt-1" style="font-size: 0.75rem;"><strong>Plataforma:</strong> {{ movie.platform or 'N/A' }}</p>
+                        {% if movie.opinion %}
+                        <div class="mt-2 p-2 rounded" style="background: rgba(255,255,255,0.05);">
+                            <p class="m-0 fst-italic opinion-scroll">"{{ movie.opinion }}"</p>
+                        </div>
+                        {% endif %}
+                        <div class="mt-auto pt-3 d-flex gap-2">
+                            <a href="{{ url_for('edit_movie', id=movie.id) }}" class="btn btn-sm w-50 rounded-pill fw-bold" style="font-size: 0.75rem; background:#00E676; color:#000;">Calificar</a>
+                            <form action="{{ url_for('delete_movie', id=movie.id) }}" method="POST" class="w-50" onsubmit="return confirm('¿Borrar película?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm w-100 rounded-pill" style="font-size: 0.75rem;">Borrar</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% if not hay_volver.value %}
+            <div class="col-12"><div class="alert text-center border" style="background-color: var(--bg-card); color: var(--text-muted); border-color: rgba(255,255,255,0.1)!important;">No tenés películas pendientes de calificar.</div></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ======================== WATCHLIST ======================== -->
     <div class="tab-pane fade" id="watchlist" role="tabpanel">
-        <div class="row">
+        <div class="row" id="watchlistGrid">
             {% for movie in pendientes %}
-            <div class="col-6 col-md-3 mb-4">
+            <div class="col-6 col-md-3 mb-4 watchlist-item all-item" data-title="{{ movie.title | lower }}" data-date="0000-00-00" data-score="-3">
                 <div class="card h-100 movie-card shadow-lg" onclick="this.classList.toggle('touch-active')">
                     {% if movie.poster_path %}
                     <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" class="card-img-top h-100 object-fit-cover" loading="lazy">
@@ -152,14 +209,9 @@
                     <span class="badge bg-info text-dark badge-score shadow" style="font-size: 0.85rem; padding: 5px 10px;">📌 Pendiente</span>
                     <div class="movie-info-overlay text-center d-flex flex-column justify-content-center">
                         <h6 class="fw-bold mb-2 text-info">{{ movie.title }}</h6>
-                        
-                        {% if movie.imdb_score %}
-                        <p class="mb-1 fw-bold" style="font-size: 0.8rem; color: #f5c518; letter-spacing: 0.5px;">IMDb ⭐ {{ movie.imdb_score }}</p>
-                        {% endif %}
-                        
+                        {% if movie.imdb_score %}<p class="mb-1 fw-bold" style="font-size: 0.8rem; color: #f5c518;">IMDb ⭐ {{ movie.imdb_score }}</p>{% endif %}
                         <p class="mb-1" style="font-size: 0.75rem;"><strong>Dir:</strong> {{ movie.director }}</p>
                         <p class="mb-2" style="font-size: 0.7rem;"><strong>Cast:</strong> {{ movie.cast }}</p>
-                        
                         <div class="mt-auto pt-3 d-flex gap-2">
                             <a href="{{ url_for('edit_movie', id=movie.id) }}" class="btn btn-info btn-sm w-50 rounded-pill text-dark fw-bold" style="font-size: 0.75rem;">Ya la vi</a>
                             <form action="{{ url_for('delete_movie', id=movie.id) }}" method="POST" class="w-50" onsubmit="return confirm('¿Quitar de la lista?');">
@@ -169,38 +221,125 @@
                     </div>
                 </div>
             </div>
+            {% else %}
+            <div class="col-12"><div class="alert text-center border" style="background-color: var(--bg-card); color: var(--text-muted); border-color: rgba(255,255,255,0.1)!important;">Tu Watchlist está vacía.</div></div>
             {% endfor %}
         </div>
     </div>
+
+    <!-- ======================== ABANDONADAS ======================== -->
+    <div class="tab-pane fade" id="abandonadas" role="tabpanel">
+        <div class="row" id="abandonadasGrid">
+            {% set hay_aband = namespace(value=false) %}
+            {% for movie in peliculas %}
+            {% if movie.abandoned %}
+            {% set hay_aband.value = true %}
+            <div class="col-6 col-md-3 mb-4 aband-item all-item" data-title="{{ movie.title | lower }}" data-date="{{ movie.date_watched or '0000-00-00' }}" data-score="-2">
+                <div class="card h-100 movie-card shadow-lg" onclick="this.classList.toggle('touch-active')">
+                    {% if movie.poster_path %}
+                    <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" class="card-img-top h-100 object-fit-cover" loading="lazy">
+                    {% else %}
+                    <div class="card-img-top bg-secondary text-white d-flex align-items-center justify-content-center" style="height: 300px;">Sin Imagen</div>
+                    {% endif %}
+                    <div class="badge-score d-flex rounded overflow-hidden shadow border border-danger">
+                        <div class="bg-dark text-danger px-2 py-1 fw-bold" style="font-size: 0.8rem;">❌ Abandonada</div>
+                    </div>
+                    <div class="movie-info-overlay text-center">
+                        <h6 class="fw-bold mb-2" style="color: #FF1744;">{{ movie.title }}</h6>
+                        {% if movie.imdb_score %}<p class="mb-1 fw-bold" style="font-size: 0.8rem; color: #f5c518;">IMDb ⭐ {{ movie.imdb_score }}</p>{% endif %}
+                        <p class="mb-1" style="font-size: 0.75rem;"><strong>Dir:</strong> {{ movie.director }}</p>
+                        <p class="mb-2" style="font-size: 0.7rem;"><strong>Cast:</strong> {{ movie.cast }}</p>
+                        <hr class="border-light opacity-25 my-1">
+                        <p class="mb-1 mt-1" style="font-size: 0.75rem;"><strong>Fecha:</strong> {{ movie.date_watched or 'N/A' }}</p>
+                        {% if movie.opinion %}
+                        <div class="mt-2 p-2 rounded" style="background: rgba(255,255,255,0.05);">
+                            <p class="m-0 fst-italic opinion-scroll">"{{ movie.opinion }}"</p>
+                        </div>
+                        {% endif %}
+                        <div class="mt-auto pt-3 d-flex gap-2">
+                            <a href="{{ url_for('edit_movie', id=movie.id) }}" class="btn btn-outline-light btn-sm w-50 rounded-pill" style="font-size: 0.75rem;">Editar</a>
+                            <form action="{{ url_for('delete_movie', id=movie.id) }}" method="POST" class="w-50" onsubmit="return confirm('¿Borrar película?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm w-100 rounded-pill" style="font-size: 0.75rem;">Borrar</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% if not hay_aband.value %}
+            <div class="col-12"><div class="alert text-center border" style="background-color: var(--bg-card); color: var(--text-muted); border-color: rgba(255,255,255,0.1)!important;">No abandonaste ninguna película. 💪</div></div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- Mensaje de búsqueda global sin resultados -->
+<div id="noResultsMsg" class="text-center text-muted py-5 d-none" style="font-size: 0.9rem;">
+    😶 No se encontraron películas con ese nombre en ninguna sección.
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const searchInput = document.getElementById('liveSearch');
-        const sortSelect = document.getElementById('sortSelect');
-        const grid = document.getElementById('moviesGrid');
-        let movieItems = Array.from(document.querySelectorAll('.movie-item'));
+document.addEventListener("DOMContentLoaded", function() {
+    const searchInput = document.getElementById('liveSearch');
+    const sortSelect  = document.getElementById('sortSelect');
+    const searchHint  = document.getElementById('searchHint');
+    const noResults   = document.getElementById('noResultsMsg');
 
-        if(searchInput) {
-            searchInput.addEventListener('input', function(e) {
-                const term = e.target.value.toLowerCase();
-                movieItems.forEach(item => {
-                    item.style.display = item.getAttribute('data-title').includes(term) ? 'block' : 'none';
-                });
-            });
+    // Todos los items de todas las tabs
+    const getAll = () => Array.from(document.querySelectorAll('.all-item'));
+    // Solo los de la colección (para sort)
+    const getColeccion = () => Array.from(document.querySelectorAll('#moviesGrid .movie-item'));
+
+    // ---- BÚSQUEDA GLOBAL ----
+    searchInput.addEventListener('input', function() {
+        const term = this.value.toLowerCase().trim();
+
+        if (term === '') {
+            // Sin búsqueda: restauramos visibilidad normal, ocultamos hint
+            getAll().forEach(item => { item.style.display = 'block'; });
+            searchHint.classList.remove('visible');
+            noResults.classList.add('d-none');
+            return;
         }
-        if(sortSelect) {
-            sortSelect.addEventListener('change', function(e) {
-                const sortType = e.target.value;
-                movieItems.sort((a, b) => {
-                    if(sortType === 'date-desc') return b.getAttribute('data-date').localeCompare(a.getAttribute('data-date'));
-                    else if(sortType === 'date-asc') return a.getAttribute('data-date').localeCompare(b.getAttribute('data-date'));
-                    else if(sortType === 'score-desc') return parseInt(b.getAttribute('data-score')) - parseInt(a.getAttribute('data-score'));
-                    else if(sortType === 'alpha-asc') return a.getAttribute('data-title').localeCompare(b.getAttribute('data-title'));
-                });
-                movieItems.forEach(item => grid.appendChild(item));
-            });
-        }
+
+        searchHint.classList.add('visible');
+        let anyVisible = false;
+
+        getAll().forEach(item => {
+            const matches = item.getAttribute('data-title').includes(term);
+            item.style.display = matches ? 'block' : 'none';
+            if (matches) anyVisible = true;
+        });
+
+        noResults.classList.toggle('d-none', anyVisible);
     });
+
+    // ---- SORT (solo afecta Colección) ----
+    sortSelect.addEventListener('change', function() {
+        const sortType = this.value;
+        const grid = document.getElementById('moviesGrid');
+        let items = getColeccion();
+
+        items.sort((a, b) => {
+            if (sortType === 'date-desc')  return b.getAttribute('data-date').localeCompare(a.getAttribute('data-date'));
+            if (sortType === 'date-asc')   return a.getAttribute('data-date').localeCompare(b.getAttribute('data-date'));
+            if (sortType === 'score-desc') return parseInt(b.getAttribute('data-score')) - parseInt(a.getAttribute('data-score'));
+            if (sortType === 'alpha-asc')  return a.getAttribute('data-title').localeCompare(b.getAttribute('data-title'));
+        });
+        items.forEach(item => grid.appendChild(item));
+    });
+
+    // ---- "Volver a ver" tab: estilo activo verde ----
+    const volverTab = document.getElementById('volver-tab');
+    volverTab.addEventListener('shown.bs.tab', () => { volverTab.style.opacity = '1'; });
+    volverTab.addEventListener('hidden.bs.tab', () => { volverTab.style.opacity = '0.6'; });
+
+    // ---- "Abandonadas" tab: estilo activo rojo ----
+    const abandTab = document.getElementById('abandonadas-tab');
+    abandTab.addEventListener('shown.bs.tab', () => { abandTab.style.opacity = '1'; });
+    abandTab.addEventListener('hidden.bs.tab', () => { abandTab.style.opacity = '0.6'; });
+});
 </script>
 {% endblock %}

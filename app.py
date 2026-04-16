@@ -5,14 +5,14 @@ import os
 import csv
 from io import StringIO
 from dotenv import load_dotenv
-from google import genai
+from openai import OpenAI
 import json
 import requests
 
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = 'super_secreto_para_cookies'
+app.secret_key = os.getenv('SECRET_KEY', 'fallback_dev_key_cambiar_en_prod')
 # Lee la URL de la base de datos desde tu archivo .env (PostgreSQL)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -152,6 +152,94 @@ def index():
     
     return render_template('index.html', peliculas=vistas, pendientes=pendientes, stats=stats)
 
+@app.route('/dashboard/stats')
+def stats():
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+
+    todas = Movie.query.filter_by(user_id=session['user_id']).all()
+    vistas = [p for p in todas if not p.is_watchlist and not p.abandoned]
+    abandonadas = [p for p in todas if p.abandoned]
+    pendientes = [p for p in todas if p.is_watchlist]
+    volver_a_ver = [p for p in vistas if p.rating is None]
+    calificadas = [p for p in vistas if p.rating is not None]
+
+    # Promedio general
+    promedio = round(sum(p.rating for p in calificadas) / len(calificadas)) if calificadas else 0
+
+    # Distribución de puntuaciones
+    rangos = {'0-34': 0, '35-54': 0, '55-74': 0, '75-89': 0, '90-99': 0, '100': 0}
+    for p in calificadas:
+        r = p.rating
+        if r == 100: rangos['100'] += 1
+        elif r >= 90: rangos['90-99'] += 1
+        elif r >= 75: rangos['75-89'] += 1
+        elif r >= 55: rangos['55-74'] += 1
+        elif r >= 35: rangos['35-54'] += 1
+        else: rangos['0-34'] += 1
+
+    # Películas por mes — todos los meses con actividad, ordenados cronológicamente
+    from collections import defaultdict
+    por_mes = defaultdict(int)
+    for p in vistas:
+        if p.date_watched and len(p.date_watched) >= 7:
+            mes_key = p.date_watched[:7]  # "YYYY-MM"
+            por_mes[mes_key] += 1
+    meses_sorted = sorted(por_mes.items())  # todos, orden cronológico
+
+    # Top plataformas
+    plataformas = defaultdict(int)
+    for p in vistas:
+        if p.platform:
+            plataformas[p.platform] += 1
+    top_plataformas = sorted(plataformas.items(), key=lambda x: x[1], reverse=True)[:6]
+
+    # Top géneros — solo el género PRINCIPAL (primer elemento) de cada película
+    generos_count = defaultdict(int)
+    for p in vistas:
+        if p.genres:
+            primer_genero = p.genres.split(',')[0].strip()
+            if primer_genero:
+                generos_count[primer_genero] += 1
+    top_generos = sorted(generos_count.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # Top directores
+    directores_count = defaultdict(int)
+    for p in calificadas:
+        if p.director and p.director != 'Desconocido':
+            directores_count[p.director] += 1
+    top_directores = sorted(directores_count.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # Mejor y peor película
+    mejor = max(calificadas, key=lambda x: x.rating) if calificadas else None
+    peor = min(calificadas, key=lambda x: x.rating) if calificadas else None
+
+    # Película más reciente y más antigua con fecha
+    con_fecha = [p for p in vistas if p.date_watched]
+    con_fecha_sorted = sorted(con_fecha, key=lambda x: x.date_watched)
+    primera = con_fecha_sorted[0] if con_fecha_sorted else None
+    ultima = con_fecha_sorted[-1] if con_fecha_sorted else None
+
+    stats_data = {
+        'total_vistas': len(vistas),
+        'total_calificadas': len(calificadas),
+        'total_abandonadas': len(abandonadas),
+        'total_pendientes': len(pendientes),
+        'total_volver': len(volver_a_ver),
+        'promedio': promedio,
+        'rangos': rangos,
+        'meses': meses_sorted,
+        'top_plataformas': top_plataformas,
+        'top_generos': top_generos,
+        'top_directores': top_directores,
+        'mejor': mejor,
+        'peor': peor,
+        'primera': primera,
+        'ultima': ultima,
+    }
+
+    return render_template('stats.html', stats=stats_data)
+
 @app.route('/dashboard/form', methods=['GET', 'POST'])
 def form():
     if not session.get('user_id'):
@@ -265,20 +353,22 @@ def edit_movie(id):
 def oracle():
     if not session.get('user_id'):
         return redirect(url_for('login'))
-        
-    # Si solo entra a la página, mostramos el botón
+
     if request.method == 'GET':
         return render_template('oracle.html')
-        
-    # --- LOGICA DEL POST (CUANDO TOCA EL BOTON) ---
+
+    # --- LOGICA DEL POST ---
     mis_pelis = Movie.query.filter_by(user_id=session['user_id']).all()
-    
+
     if len(mis_pelis) < 3:
         return jsonify({'error': "El Oráculo necesita más datos. Agregá al menos 3 películas a tu bóveda."})
-        
+
+    # Recibimos cuántas quiere (3 primera vez, 5 segunda vez) y los títulos ya mostrados
+    cantidad = int(request.json.get('cantidad', 3)) if request.is_json else 3
+    ya_mostradas = request.json.get('ya_mostradas', []) if request.is_json else []
+
     historial = []
     for p in mis_pelis:
-        # Detectamos si es una película que está solo en la Watchlist (sin calificar ni abandonar)
         if p.is_watchlist and not p.rating and not p.abandoned:
             historial.append(f"'{p.title}' (En mi Watchlist - NO RECOMENDAR)")
         elif p.abandoned:
@@ -287,71 +377,83 @@ def oracle():
             historial.append(f"'{p.title}' (Puntaje: {p.rating}/100)")
         else:
             historial.append(f"'{p.title}' (Vista)")
-            
+
     reporte_peliculas = ", ".join(historial)
-    
-    # FORZAMOS A LA IA A DEVOLVER JSON PURO Y ESQUIVAR LA WATCHLIST
+
+    # Excluimos las ya mostradas en la consulta anterior
+    excluir_str = ""
+    if ya_mostradas:
+        excluir_str = f"\nAdemás, en una consulta anterior ya recomendé estas películas, NO las repitas: {', '.join(ya_mostradas)}."
+
     prompt = f"""
-    Eres 'El Oráculo', un experto cinéfilo. Analiza mi historial: {reporte_peliculas}.
-    Recomiéndame 3 películas que NO estén en esta lista (es vital que ignores las que dicen "NO RECOMENDAR" porque ya las tengo pendientes).
+    Eres 'El Oráculo', un experto cinéfilo. Analiza mi historial: {reporte_peliculas}.{excluir_str}
+    Tu respuesta tiene DOS partes:
+
+    PARTE 1: Recomiéndame exactamente {cantidad} películas que NO estén en ninguna de las listas anteriores, basadas en mis gustos.
+
+    PARTE 2 (BONUS SALVAJE): Recomiéndame UNA sola película completamente inesperada, que no tenga nada que ver con mis gustos habituales pero que sea una obra que hay que ver al menos una vez en la vida. Marcala con "bonus": true.
+
     Devuelve ÚNICAMENTE un arreglo JSON válido con esta estructura exacta, sin texto adicional ni formato markdown:
     [
-        {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué me va a gustar..."}}
+        {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué me va a gustar...", "bonus": false}},
+        {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué es imprescindible aunque salga de tu zona de confort.", "bonus": true}}
     ]
+    El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales (bonus: false) y 1 bonus (bonus: true) al final.
     """
-    
+
     try:
-        client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
-        response = client.models.generate_content(
-            model='gemini-2.5-flash', 
-            contents=prompt
+        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        response = client.chat.completions.create(
+            model='gpt-5-nano',
+            messages=[{'role': 'user', 'content': prompt}]
         )
-        
-        # Limpiamos por si Gemini manda comillas invertidas de código
-        texto_limpio = response.text.strip()
+
+        texto_limpio = response.choices[0].message.content.strip()
         if texto_limpio.startswith("```json"):
             texto_limpio = texto_limpio[7:-3].strip()
         elif texto_limpio.startswith("```"):
             texto_limpio = texto_limpio[3:-3].strip()
-            
+
         recomendaciones = json.loads(texto_limpio)
-        
+
         # ENRIQUECER CON TMDB
         tmdb_api_key = os.getenv('TMDB_API_KEY')
         resultados_finales = []
-        
+
         for rec in recomendaciones:
-            # URL limpia 1: Búsqueda
             search_url = f"https://api.themoviedb.org/3/search/movie?api_key={tmdb_api_key}&query={rec['titulo']}&year={rec['anio']}&language=es-ES"
             tmdb_res = requests.get(search_url).json()
-            
+
+            poster_fallback = '/static/mbvault-512.png'
+            es_bonus = rec.get('bonus', False)
+
             if tmdb_res.get('results'):
                 peli = tmdb_res['results'][0]
                 resultados_finales.append({
                     'titulo': peli.get('title'),
-                    # URL limpia 2 y 3: Pósters
-                    'poster': f"https://image.tmdb.org/t/p/w500{peli['poster_path']}" if peli.get('poster_path') else 'https://via.placeholder.com/500x750?text=Sin+Poster',
+                    'poster': f"https://image.tmdb.org/t/p/w500{peli['poster_path']}" if peli.get('poster_path') else poster_fallback,
                     'sinopsis': peli.get('overview', 'Sin descripción disponible.'),
                     'fecha': peli.get('release_date', '').split('-')[0] if peli.get('release_date') else rec['anio'],
                     'justificacion': rec['justificacion'],
-                    'tmdb_id': peli['id']
+                    'tmdb_id': peli['id'],
+                    'bonus': es_bonus
                 })
             else:
                 resultados_finales.append({
                     'titulo': rec['titulo'],
-                    # URL limpia 4: Póster de respaldo
-                    'poster': 'https://via.placeholder.com/500x750?text=Sin+Poster',
+                    'poster': poster_fallback,
                     'sinopsis': 'Detalles no encontrados en TMDB.',
                     'fecha': rec['anio'],
                     'justificacion': rec['justificacion'],
-                    'tmdb_id': ''
+                    'tmdb_id': '',
+                    'bonus': es_bonus
                 })
-                
+
         return jsonify({'success': True, 'peliculas': resultados_finales})
-        
+
     except Exception as e:
         return jsonify({'error': f"Fallo en la conexión neural: {str(e)}"})
-    
+
 @app.route('/dashboard/oracle/add_watchlist', methods=['POST'])
 def oracle_add_watchlist():
     if not session.get('user_id'):

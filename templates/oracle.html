@@ -1,78 +1,137 @@
 {% extends "layout.html" %}
 {% block content %}
 <style>
-    .movie-card-container { transition: transform 0.3s ease; }
-    .movie-card-container:hover { transform: translateY(-5px); }
-    .hover-info { opacity: 0; transition: opacity 0.3s ease; background: rgba(18, 18, 18, 0.95); }
-    .movie-card-container:hover .hover-info { opacity: 1; }
+    .oracle-card { transition: transform 0.3s ease; }
+    .oracle-card:hover { transform: translateY(-5px); }
+    .hover-info { opacity: 0; transition: opacity 0.3s ease; background: rgba(18,18,18,0.95); }
+    .oracle-card:hover .hover-info { opacity: 1; }
     .loading-pulse { animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-    
-    /* MAGIA RESPONSIVE: En móvil es un carrusel táctil, en PC es una grilla */
-    .swipe-indicator { display: none; }
+    @keyframes pulse { 0%{opacity:0.6} 50%{opacity:1} 100%{opacity:0.6} }
+
+    .bonus-card { border: 2px solid #FF9100 !important; box-shadow: 0 0 20px rgba(255,145,0,0.35) !important; }
+    .bonus-badge { position:absolute; top:10px; left:10px; z-index:5; background:#FF9100; color:#000;
+                   font-size:0.7rem; font-weight:700; border-radius:6px; padding:3px 8px;
+                   letter-spacing:0.5px; text-transform:uppercase; box-shadow:0 2px 8px rgba(255,145,0,0.5); }
+
+    /* Contenedor con flechas a los costados */
+    .oracle-viewport {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .oracle-arrow {
+        flex-shrink: 0;
+        background: transparent;
+        border: 1px solid rgba(255,255,255,0.15);
+        color: var(--text-muted);
+        border-radius: 50%;
+        width: 38px; height: 38px;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: border-color 0.2s, color 0.2s, background 0.2s;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+    }
+    .oracle-arrow:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.06); }
+    .oracle-arrow:disabled { opacity: 0.18; cursor: default; }
+
+    /* Scroll horizontal */
+    .oracle-scroll-wrap {
+        flex: 1;
+        overflow-x: auto;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        cursor: grab;
+        padding-bottom: 8px;
+    }
+    .oracle-scroll-wrap.grabbing { cursor: grabbing; }
+    .oracle-scroll-wrap::-webkit-scrollbar { height: 3px; }
+    .oracle-scroll-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 4px; }
+    .oracle-scroll-wrap::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+
+    .oracle-row {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 16px;
+        padding: 0 2px 4px;
+    }
+    .oracle-col {
+        flex: 0 0 calc(33.333% - 11px);
+        min-width: 200px;
+    }
+
+    /* Indicador de página */
+    .oracle-page-indicator {
+        text-align: center;
+        margin-top: 10px;
+        color: var(--bg-main);
+        font-size: 0.8rem;
+    }
+
     @media (max-width: 767px) {
-        .mobile-scroll-container {
-            display: flex;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            scroll-snap-type: x mandatory; /* Volvemos a mandatory para centrado perfecto */
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-            padding-bottom: 15px;
-        }
-        .mobile-scroll-container::-webkit-scrollbar { display: none; } 
-        .mobile-scroll-container > .col-md-4 {
-            flex: 0 0 100%;
-            scroll-snap-align: center;
-            scroll-snap-stop: always; /* <-- ESTA ES LA MAGIA: Obliga a frenar en cada carta */
-        }
-        .swipe-indicator { 
-            display: block; 
-            color: var(--accent); 
-            font-size: 0.9rem; 
-            margin-bottom: 20px; 
-            animation: pulse 2s infinite; 
-        }
+        .oracle-col { flex: 0 0 80%; }
+        .oracle-card .hover-info { display: none !important; }
+        .oracle-arrow { width: 32px; height: 32px; font-size: 0.95rem; }
     }
 </style>
 
 <div class="row justify-content-center">
-    <div class="col-lg-10 text-center">
-        <div id="header-text">
-            <h2 class="fw-bold mb-4" style="color: var(--accent);">👁️ El Oráculo</h2>
-            <p class="text-muted mb-4">Descubriendo tu próxima obsesión cinematográfica.</p>
-        </div>
-        
-        <div id="initial-state">
-            <button id="btn-consultar" class="btn btn-accent btn-lg rounded-pill px-5 py-3 fw-bold shadow-lg">
-                Consultar al Oráculo
-            </button>
-        </div>
+  <div class="col-lg-10 text-center">
 
-        <div id="loading-state" class="d-none mt-5">
-            <div class="spinner-border text-info mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
-            <h4 id="loading-text" class="loading-pulse" style="color: var(--accent);">Despertando al Oráculo...</h4>
-        </div>
-
-        <div id="results-state" class="mt-4 d-none">
-            <div class="swipe-indicator text-center">👈 Deslizá para ver más 👉</div>
-            <div class="row mobile-scroll-container text-start" id="carousel-content">
-                </div>
-            
-            <button id="btn-reiniciar" class="btn btn-outline-info rounded-pill mt-5 mx-auto">
-                Consultar de nuevo
-            </button>
-        </div>
+    <div id="header-text">
+      <h2 class="fw-bold mb-4" style="color:var(--accent);">👁️ El Oráculo</h2>
+      <p class="text-muted mb-4">Descubriendo tu próxima obsesión cinematográfica.</p>
     </div>
+
+    <!-- Estado inicial -->
+    <div id="initial-state">
+      <button id="btn-consultar" class="btn btn-accent btn-lg rounded-pill px-5 py-3 fw-bold shadow-lg">
+        Consultar al Oráculo
+      </button>
+    </div>
+
+    <!-- Cargando -->
+    <div id="loading-state" class="d-none mt-5">
+      <div class="spinner-border text-info mb-3" style="width:3rem;height:3rem;" role="status"></div>
+      <h4 id="loading-text" class="loading-pulse" style="color:var(--accent);">Despertando al Oráculo...</h4>
+    </div>
+
+    <!-- Resultados -->
+    <div id="results-state" class="mt-4 d-none">
+      <h5 id="results-title" class="fw-bold mb-1" style="color:var(--accent);"></h5>
+      <p class="text-muted mb-4" style="font-size:0.85rem;" id="results-subtitle"></p>
+
+      <div class="oracle-viewport">
+        <button class="oracle-arrow" id="btn-prev" onclick="changePage(-1)">←</button>
+        <div class="oracle-scroll-wrap" id="oracle-scroll">
+          <div class="oracle-row text-start" id="cards-container"></div>
+        </div>
+        <button class="oracle-arrow" id="btn-next" onclick="changePage(1)">→</button>
+      </div>
+      <div class="oracle-page-indicator d-none" id="page-indicator"></div>
+
+      <div class="mt-4 d-flex flex-column align-items-center gap-3" id="btn-more-wrap">
+        <button id="btn-segunda" class="btn btn-accent rounded-pill px-5 py-2 fw-bold shadow-lg">
+          🔮 Quiero más — Dame 5 nuevas
+        </button>
+        <button class="btn btn-outline-secondary rounded-pill px-4" style="font-size:0.85rem;"
+                onclick="location.reload()">Volver a empezar</button>
+      </div>
+
+      <div class="mt-4 d-none" id="btn-restart-only">
+        <button class="btn btn-outline-secondary rounded-pill px-4" style="font-size:0.85rem;"
+                onclick="location.reload()">Volver a empezar</button>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <script>
-    const btnConsultar = document.getElementById('btn-consultar');
-    const btnReiniciar = document.getElementById('btn-reiniciar');
-    const initialState = document.getElementById('initial-state');
-    const loadingState = document.getElementById('loading-state');
-    const resultsState = document.getElementById('results-state');
-    const loadingText = document.getElementById('loading-text');
+    const CARDS_PER_PAGE = 3;
+    let allCards = [];
+    let currentPage = 0;
+    let titulosMostrados = [];
 
     const frases = [
         "Revisando tu Watchlist para no repetir...",
@@ -82,102 +141,204 @@
         "Preparando la revelación final..."
     ];
 
-    btnReiniciar.addEventListener('click', () => location.reload());
-
-    async function guardarEnWatchlist(tmdbId, titulo, poster, btnElement) {
-        btnElement.innerHTML = '⏳ Guardando...';
-        btnElement.disabled = true;
-        
+    async function guardarEnWatchlist(tmdbId, titulo, poster, btn) {
+        btn.innerHTML = '⏳ Guardando...';
+        btn.disabled = true;
         try {
             const res = await fetch("{{ url_for('oracle_add_watchlist') }}", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tmdb_id: tmdbId, titulo: titulo, poster: poster })
+                body: JSON.stringify({ tmdb_id: tmdbId, titulo, poster })
             });
             const data = await res.json();
-            
-            if(data.success) {
-                btnElement.innerHTML = '✅ En Watchlist';
-                btnElement.classList.replace('btn-info', 'btn-success');
+            if (data.success) {
+                btn.innerHTML = '✅ En Watchlist';
+                btn.className = btn.className.replace('btn-info','btn-success').replace('btn-warning','btn-success');
             } else {
                 alert(data.error);
-                btnElement.innerHTML = '➕ Agregar a Watchlist';
-                btnElement.disabled = false;
+                btn.innerHTML = '➕ Agregar a Watchlist';
+                btn.disabled = false;
             }
         } catch(e) {
             alert('Error de conexión');
-            btnElement.innerHTML = '➕ Agregar a Watchlist';
-            btnElement.disabled = false;
+            btn.innerHTML = '➕ Agregar a Watchlist';
+            btn.disabled = false;
         }
     }
 
-    btnConsultar.addEventListener('click', async () => {
-        initialState.classList.add('d-none');
-        loadingState.classList.remove('d-none');
-        
-        let fraseIndex = 0;
-        const fraseInterval = setInterval(() => {
-            fraseIndex = (fraseIndex + 1) % frases.length;
-            loadingText.innerText = frases[fraseIndex];
-        }, 2500);
+    function buildCardHtml(peli) {
+        const tituloSafe = (peli.titulo || '').replace(/'/g, "\\'");
+        const esBonus = peli.bonus === true;
+        const bonusBadge  = esBonus ? `<div class="bonus-badge">🎲 bonus</div>` : '';
+        const cardClass   = esBonus ? 'bonus-card' : '';
+        const btnColor    = esBonus ? 'btn-warning' : 'btn-info';
+        const hoverColor  = esBonus ? '#FF9100' : 'var(--accent)';
+        const labelColor  = esBonus ? '#FF9100' : 'var(--accent)';
+        const labelText   = esBonus ? '🎲 Por qué es imprescindible:' : '🔥 Por qué te gustará:';
+        return `
+        <div class="oracle-col">
+          <div class="card form-section-card border-0 shadow-lg oracle-card position-relative overflow-hidden h-100 ${cardClass}">
+            ${bonusBadge}
+            <img src="${peli.poster}" class="card-img-top" style="object-fit:cover;height:420px;"
+                 onerror="this.src='/static/mbvault-512.png'">
+            <div class="hover-info position-absolute top-0 start-0 w-100 d-flex flex-column justify-content-center align-items-center p-4 text-white" style="height:420px!important;">
+              <h4 class="fw-bold text-center" style="color:${hoverColor};">${peli.titulo} (${peli.fecha})</h4>
+              <p class="small mb-4 text-center" style="font-size:0.9rem;overflow-y:auto;max-height:180px;">${peli.sinopsis}</p>
+              <button class="${btnColor} btn rounded-pill fw-bold shadow-lg px-4"
+                      onclick="guardarEnWatchlist('${peli.tmdb_id}','${tituloSafe}','${peli.poster}',this)">
+                ➕ Agregar a Watchlist
+              </button>
+            </div>
+            <div class="card-body bg-dark text-start d-flex flex-column">
+              <h5 class="card-title fw-bold text-center text-white">${peli.titulo}</h5>
+              <hr class="border-secondary">
+              <p class="card-text small text-muted flex-grow-1">
+                <span style="color:${labelColor};">${labelText}</span><br>${peli.justificacion}
+              </p>
+            </div>
+          </div>
+        </div>`;
+    }
 
-        try {
-            const response = await fetch("{{ url_for('oracle') }}", { method: 'POST' });
-            const data = await response.json();
-            
-            clearInterval(fraseInterval);
-            loadingState.classList.add('d-none');
-            
-            // Ocultamos el título principal para limpiar la pantalla
-            document.getElementById('header-text').classList.add('d-none');
+    function getPageWidth() {
+        const col = document.querySelector('.oracle-col');
+        if (!col) return 0;
+        return (col.offsetWidth + 16) * CARDS_PER_PAGE;
+    }
 
-            if (data.error) {
-                document.getElementById('carousel-content').innerHTML = `<div class="alert alert-danger w-100 text-center">${data.error}</div>`;
-                resultsState.classList.remove('d-none');
-                return;
-            }
-
-            document.getElementById('carousel-content').innerHTML = '';
-            
-            data.peliculas.forEach(peli => {
-                const tituloSafe = peli.titulo.replace(/'/g, "\\'");
-                
-                const cardHtml = `
-                    <div class="col-md-4 mb-4">
-                        <div class="card form-section-card border-0 shadow-lg movie-card-container position-relative overflow-hidden h-100">
-                            <img src="${peli.poster}" class="card-img-top" alt="Poster" style="object-fit: cover; height: 500px;">
-                            
-                            <div class="hover-info position-absolute top-0 start-0 w-100 d-flex flex-column justify-content-center align-items-center p-4 text-white" style="height: 500px !important;">
-                                <h4 class="fw-bold text-center" style="color: var(--accent);">${peli.titulo} (${peli.fecha})</h4>
-                                <p class="small mb-4 text-center" style="font-size: 0.9rem; overflow-y: auto; max-height: 200px;">${peli.sinopsis}</p>
-                                
-                                <button class="btn btn-info rounded-pill fw-bold shadow-lg px-4" onclick="guardarEnWatchlist('${peli.tmdb_id}', '${tituloSafe}', '${peli.poster}', this)">
-                                    ➕ Agregar a Watchlist
-                                </button>
-                            </div>
-
-                            <div class="card-body bg-dark text-start d-flex flex-column">
-                                <h5 class="card-title fw-bold text-center text-white">${peli.titulo}</h5>
-                                <hr class="border-secondary">
-                                <p class="card-text small text-muted flex-grow-1">
-                                    <span style="color: var(--accent);">🔥 Por qué te gustará:</span><br>
-                                    ${peli.justificacion}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                document.getElementById('carousel-content').innerHTML += cardHtml;
-            });
-            
-            resultsState.classList.remove('d-none');
-
-        } catch (error) {
-            clearInterval(fraseInterval);
-            loadingState.classList.add('d-none');
-            document.getElementById('carousel-content').innerHTML = `<div class="alert alert-danger w-100 text-center">Fallo en la matriz del Oráculo.</div>`;
-            resultsState.classList.remove('d-none');
+    function updateNav() {
+        const totalPages = Math.ceil(allCards.length / CARDS_PER_PAGE);
+        const indicator = document.getElementById('page-indicator');
+        if (totalPages > 1) {
+            indicator.textContent = `${currentPage + 1} / ${totalPages}`;
+            indicator.classList.remove('d-none');
+        } else {
+            indicator.classList.add('d-none');
         }
+        document.getElementById('btn-prev').disabled = currentPage === 0;
+        document.getElementById('btn-next').disabled = currentPage >= totalPages - 1;
+    }
+
+    function renderCards() {
+        document.getElementById('cards-container').innerHTML = allCards.map(buildCardHtml).join('');
+        currentPage = 0;
+        updateNav();
+        initDragScroll();
+    }
+
+    function changePage(dir) {
+        const totalPages = Math.ceil(allCards.length / CARDS_PER_PAGE);
+        const newPage = Math.max(0, Math.min(totalPages - 1, currentPage + dir));
+        if (newPage === currentPage) return;
+        currentPage = newPage;
+        document.getElementById('oracle-scroll').scrollTo({ left: getPageWidth() * newPage, behavior: 'smooth' });
+        updateNav();
+    }
+
+    // Drag-to-scroll con mouse (desktop)
+    function initDragScroll() {
+        const wrap = document.getElementById('oracle-scroll');
+        let isDown = false, startX = 0, scrollLeft = 0;
+
+        wrap.addEventListener('mousedown', e => {
+            isDown = true;
+            wrap.classList.add('grabbing');
+            startX = e.pageX - wrap.offsetLeft;
+            scrollLeft = wrap.scrollLeft;
+        });
+        wrap.addEventListener('mouseleave', () => { isDown = false; wrap.classList.remove('grabbing'); });
+        wrap.addEventListener('mouseup',    () => { isDown = false; wrap.classList.remove('grabbing'); });
+        wrap.addEventListener('mousemove',  e => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - wrap.offsetLeft;
+            wrap.scrollLeft = scrollLeft - (x - startX) * 1.2;
+        });
+
+        // Rueda del mouse → scroll horizontal
+        wrap.addEventListener('wheel', e => {
+            if (e.deltaY === 0) return;
+            e.preventDefault();
+            wrap.scrollBy({ left: e.deltaY * 1.5, behavior: 'smooth' });
+        }, { passive: false });
+
+        // Actualiza el indicador de página al scrollear manualmente
+        wrap.addEventListener('scroll', () => {
+            const pw = getPageWidth();
+            if (pw > 0) {
+                currentPage = Math.round(wrap.scrollLeft / pw);
+                updateNav();
+            }
+        }, { passive: true });
+    }
+
+    async function consultarOraculo(cantidad, yaMostradas) {
+        document.getElementById('loading-state').classList.remove('d-none');
+        let idx = 0;
+        const interval = setInterval(() => {
+            idx = (idx + 1) % frases.length;
+            document.getElementById('loading-text').innerText = frases[idx];
+        }, 2500);
+        try {
+            const res = await fetch("{{ url_for('oracle') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cantidad, ya_mostradas: yaMostradas })
+            });
+            const data = await res.json();
+            clearInterval(interval);
+            document.getElementById('loading-state').classList.add('d-none');
+            return data;
+        } catch(e) {
+            clearInterval(interval);
+            document.getElementById('loading-state').classList.add('d-none');
+            return null;
+        }
+    }
+
+    // --- Primera consulta (3 + 1 bonus) ---
+    document.getElementById('btn-consultar').addEventListener('click', async () => {
+        document.getElementById('initial-state').classList.add('d-none');
+        const data = await consultarOraculo(3, []);
+
+        document.getElementById('header-text').classList.add('d-none');
+        document.getElementById('results-state').classList.remove('d-none');
+
+        if (!data || data.error) {
+            document.getElementById('cards-container').innerHTML =
+                `<div class="alert alert-danger w-100 text-center">${data?.error || 'Error de conexión'}</div>`;
+            document.getElementById('btn-more-wrap').classList.add('d-none');
+            return;
+        }
+
+        allCards = data.peliculas;
+        // Guardamos TODOS los títulos (incluyendo bonus) para no repetirlos en la siguiente consulta
+        titulosMostrados = allCards.map(p => p.titulo).filter(Boolean);
+
+        document.getElementById('results-title').innerText = 'Primera visión del Oráculo';
+        document.getElementById('results-subtitle').innerText = '3 recomendaciones para vos + 1 bonus';
+        renderCards();
+    });
+
+    // --- Segunda consulta (5 + 1 bonus, sin repetir nada) ---
+    document.getElementById('btn-segunda').addEventListener('click', async () => {
+        document.getElementById('btn-more-wrap').classList.add('d-none');
+        const data = await consultarOraculo(5, titulosMostrados);
+
+        if (!data || data.error) {
+            document.getElementById('cards-container').innerHTML =
+                `<div class="alert alert-danger w-100 text-center">${data?.error || 'Error de conexión'}</div>`;
+            document.getElementById('btn-restart-only').classList.remove('d-none');
+            return;
+        }
+
+        allCards = data.peliculas;
+        titulosMostrados.push(...allCards.map(p => p.titulo).filter(Boolean));
+
+        document.getElementById('results-title').innerText = 'Segunda visión del Oráculo';
+        document.getElementById('results-subtitle').innerText = '5 recomendaciones nuevas + 1 bonus';
+        document.getElementById('btn-restart-only').classList.remove('d-none');
+        renderCards();
     });
 </script>
 {% endblock %}

@@ -1,0 +1,393 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    /* ---- Base ---- */
+    .stat-card  { background: var(--bg-card); border: 1px solid rgba(255,255,255,0.05); border-radius: 15px; }
+    .kpi-value  { color: var(--accent); font-weight: 700; font-size: 1.8rem; line-height: 1; }
+    .section-title { color: var(--text-muted); text-transform: uppercase; font-size: 0.68rem;
+                     font-weight: 700; letter-spacing: 1.5px; margin-bottom: 1rem; }
+
+    /* ---- Gráfico de barras horizontal ---- */
+    .hbar-wrap  { display: flex; flex-direction: column; flex: 1; justify-content: space-between; gap: 10px; }
+    .hbar-row   { display: flex; align-items: center; gap: 8px; }
+    .hbar-label { width: 80px; min-width: 80px; text-align: right; color: var(--text-muted);
+                  font-size: 0.74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hbar-track { flex: 1; background: rgba(255,255,255,0.05); border-radius: 50px; height: 26px; overflow: hidden; }
+    .hbar-fill  { height: 100%; border-radius: 50px; display: flex; align-items: center;
+                  justify-content: flex-end; padding-right: 8px; font-size: 0.74rem; font-weight: 700;
+                  min-width: 28px; transition: width 0.9s ease; }
+    .hbar-count { width: 22px; min-width: 22px; text-align: left; color: var(--text-muted); font-size: 0.74rem; }
+    .hbar-label-dist { width: 105px; min-width: 105px; }
+
+    /* ---- Gráfico anual lineal ---- */
+    .year-chart-wrap { width: 100%; }
+    .line-chart-svg  { width: 100%; display: block; overflow: visible; }
+    /* Nav año */
+    .year-nav   { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 14px; }
+    .year-nav button { background: transparent; border: 1px solid rgba(255,255,255,0.12); color: var(--text-muted);
+                       border-radius: 50px; padding: 2px 12px; font-size: 0.8rem; cursor: pointer;
+                       transition: border-color 0.2s, color 0.2s; }
+    .year-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .year-nav button:disabled { opacity: 0.25; cursor: default; }
+    .year-nav span { font-weight: 700; font-size: 1rem; color: var(--accent); min-width: 48px; text-align: center; }
+
+    /* ---- Card mejor/peor con flip ---- */
+    .flip-card  { perspective: 800px; cursor: pointer; }
+    .flip-inner { position: relative; width: 100%; transition: transform 0.55s; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; }
+    .flip-card.flipped .flip-inner { transform: rotateY(180deg); }
+    .flip-front { backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: rotateY(0deg); }
+    .flip-back  { backface-visibility: hidden; -webkit-backface-visibility: hidden; position: absolute; top: 0; left: 0; width: 100%; transform: rotateY(180deg); }
+
+    .movie-mini { display: flex; gap: 10px; align-items: center;
+                  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+                  border-radius: 10px; padding: 10px; }
+    .mini-poster { width: 46px; height: 68px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+    .mini-poster-ph { width: 46px; height: 68px; border-radius: 6px; flex-shrink: 0;
+                      background: rgba(255,255,255,0.08); display: flex; align-items: center;
+                      justify-content: center; font-size: 1.2rem; }
+
+    .flip-btn   { display: flex; align-items: center; justify-content: center; gap: 6px;
+                  font-size: 0.72rem; color: var(--text-muted); border: 1px solid rgba(255,255,255,0.1);
+                  border-radius: 50px; padding: 4px 12px; background: transparent; cursor: pointer;
+                  transition: border-color 0.2s, color 0.2s; margin: 0 auto; }
+    .flip-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .flip-arrow { font-size: 1rem; }
+</style>
+
+<!-- ══════════════ KPIs ══════════════ -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold m-0">📊 Mis Estadísticas</h3>
+    <a href="{{ url_for('index') }}" class="btn btn-custom-outline btn-sm rounded-pill px-3">← Volver</a>
+</div>
+
+<div class="row g-3 mb-4">
+    {% set kpis = [
+        (stats.total_vistas,      'Vistas',        'var(--accent)'),
+        (stats.promedio ~ '/100', 'Promedio',       'var(--accent)'),
+        (stats.total_calificadas, 'Calificadas',   '#00E676'),
+        (stats.rangos['90-99'] + stats.rangos['100'], 'Obras Maestras', '#9D00FF'),
+        (stats.total_abandonadas, 'Abandonadas',   '#FF1744'),
+        (stats.total_pendientes,  'Watchlist',      '#FF9100'),
+    ] %}
+    {% for val, lbl, color in kpis %}
+    <div class="col-4 col-md-2">
+        <div class="stat-card text-center p-3 h-100 d-flex flex-column justify-content-center shadow-sm">
+            <div class="kpi-value" style="color:{{ color }}; font-size:1.6rem;">{{ val }}</div>
+            <small class="text-muted text-uppercase fw-bold" style="font-size:0.6rem; letter-spacing:1px;">{{ lbl }}</small>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ══════════════ GRÁFICO ANUAL (ancho completo) ══════════════ -->
+<div class="stat-card p-4 mb-4 shadow-sm">
+    <p class="section-title m-0 mb-1">📅 Actividad anual</p>
+    <div class="year-nav">
+        <button id="prevYear" onclick="changeYear(-1)">←</button>
+        <span id="yearLabel"></span>
+        <button id="nextYear" onclick="changeYear(1)">→</button>
+    </div>
+    <div class="year-chart-wrap" id="yearChartWrap"></div>
+</div>
+
+<!-- ══════════════ FILA: Plataformas | Mejor/Peor | Directores ══════════════ -->
+<div class="row g-4 mb-4">
+
+    <!-- Plataformas -->
+    <div class="col-md-4">
+        <div class="stat-card p-4 h-100 shadow-sm d-flex flex-column">
+            <p class="section-title">📺 Plataformas favoritas</p>
+            {% if stats.top_plataformas %}
+            {% set max_p = stats.top_plataformas[0][1] %}
+            <div class="hbar-wrap">
+            {% for plat, cant in stats.top_plataformas %}
+            <div class="hbar-row">
+                <span class="hbar-label" title="{{ plat }}">{{ plat }}</span>
+                <div class="hbar-track">
+                    <div class="hbar-fill" style="width:{{ (cant/max_p*100)|int }}%; background:rgba(0,229,255,0.75); color:#000;">{{ cant }}</div>
+                </div>
+                <span class="hbar-count">{{ cant }}</span>
+            </div>
+            {% endfor %}
+            </div>
+            {% else %}<p class="text-muted small mt-auto">Sin datos aún.</p>{% endif %}
+        </div>
+    </div>
+
+    <!-- Mejor / Peor  ←→  Primera / Última -->
+    <div class="col-md-4">
+        <div class="stat-card p-4 h-100 shadow-sm">
+            {% if stats.mejor %}
+            <div class="flip-card" id="flipCard">
+                <div class="flip-inner" id="flipInner">
+
+                    <!-- FRENTE: mejor y peor puntuada -->
+                    <div class="flip-front">
+                        <p class="section-title">🏆 Mejor puntuada</p>
+                        <div class="movie-mini mb-3">
+                            {% if stats.mejor.poster_path %}
+                            <img src="https://image.tmdb.org/t/p/w200{{ stats.mejor.poster_path }}" class="mini-poster">
+                            {% else %}<div class="mini-poster-ph">🎬</div>{% endif %}
+                            <div>
+                                <div class="fw-bold" style="font-size:0.88rem;">{{ stats.mejor.title }}</div>
+                                <div style="font-size:0.8rem; color:var(--accent);">★ {{ stats.mejor.rating }}/100</div>
+                                {% if stats.mejor.director %}<div class="text-muted" style="font-size:0.72rem;">{{ stats.mejor.director }}</div>{% endif %}
+                            </div>
+                        </div>
+                        {% if stats.peor %}
+                        <p class="section-title mt-2">💀 Peor puntuada</p>
+                        <div class="movie-mini">
+                            {% if stats.peor.poster_path %}
+                            <img src="https://image.tmdb.org/t/p/w200{{ stats.peor.poster_path }}" class="mini-poster">
+                            {% else %}<div class="mini-poster-ph">💀</div>{% endif %}
+                            <div>
+                                <div class="fw-bold" style="font-size:0.88rem;">{{ stats.peor.title }}</div>
+                                <div style="font-size:0.8rem; color:#FF1744;">★ {{ stats.peor.rating }}/100</div>
+                                {% if stats.peor.director %}<div class="text-muted" style="font-size:0.72rem;">{{ stats.peor.director }}</div>{% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        <hr class="border-secondary opacity-25 mt-3 mb-0">
+                        <button class="flip-btn mt-3" onclick="toggleFlip()">
+                            <span>→</span>
+                            <span>Primera / Última</span>
+                        </button>
+                    </div>
+
+                    <!-- DORSO: primera y última registrada -->
+                    <div class="flip-back">
+                        {% if stats.primera %}
+                        <p class="section-title">🕰️ Primera registrada</p>
+                        <div class="movie-mini mb-3">
+                            {% if stats.primera.poster_path %}
+                            <img src="https://image.tmdb.org/t/p/w200{{ stats.primera.poster_path }}" class="mini-poster">
+                            {% else %}<div class="mini-poster-ph">🕰️</div>{% endif %}
+                            <div>
+                                <div class="fw-bold" style="font-size:0.88rem;">{{ stats.primera.title }}</div>
+                                <div class="text-muted" style="font-size:0.75rem;">{{ stats.primera.date_watched }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if stats.ultima %}
+                        <p class="section-title mt-2">✨ Última registrada</p>
+                        <div class="movie-mini">
+                            {% if stats.ultima.poster_path %}
+                            <img src="https://image.tmdb.org/t/p/w200{{ stats.ultima.poster_path }}" class="mini-poster">
+                            {% else %}<div class="mini-poster-ph">✨</div>{% endif %}
+                            <div>
+                                <div class="fw-bold" style="font-size:0.88rem;">{{ stats.ultima.title }}</div>
+                                <div class="text-muted" style="font-size:0.75rem;">{{ stats.ultima.date_watched }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <hr class="border-secondary opacity-25 mt-3 mb-0">
+                        <button class="flip-btn mt-3" onclick="toggleFlip()">
+                            <span>←</span>
+                            <span>Mejor / Peor</span>
+                        </button>
+                    </div>
+
+                </div><!-- /flip-inner -->
+            </div><!-- /flip-card -->
+            {% else %}
+            <p class="text-muted small">Sin películas calificadas aún.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Directores -->
+    <div class="col-md-4">
+        <div class="stat-card p-4 h-100 shadow-sm d-flex flex-column">
+            <p class="section-title">🎬 Directores más vistos</p>
+            {% if stats.top_directores %}
+            {% set max_d = stats.top_directores[0][1] %}
+            <div class="hbar-wrap">
+            {% for director, cant in stats.top_directores %}
+            <div class="hbar-row">
+                <span class="hbar-label" title="{{ director }}">{{ director.split(' ')[-1] }}</span>
+                <div class="hbar-track">
+                    <div class="hbar-fill" style="width:{{ (cant/max_d*100)|int }}%; background:#9D00FF; color:#fff;">{{ cant }}</div>
+                </div>
+                <span class="hbar-count">{{ cant }}</span>
+            </div>
+            {% endfor %}
+            </div>
+            {% else %}<p class="text-muted small mt-auto">Sin datos aún.</p>{% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ══════════════ FILA: Distribución | Géneros ══════════════ -->
+<div class="row g-4 mb-4">
+
+    <!-- Distribución de puntuaciones -->
+    <div class="col-md-5">
+        <div class="stat-card p-4 h-100 shadow-sm d-flex flex-column">
+            <p class="section-title">⭐ Distribución de puntuaciones</p>
+            {% if stats.total_calificadas > 0 %}
+            {% set dist = [
+                ('Perfección',   '100',   stats.rangos['100'],   'var(--accent)', '#000'),
+                ('Obra Maestra', '90–99', stats.rangos['90-99'], '#9D00FF',       '#fff'),
+                ('Muy buena',    '75–89', stats.rangos['75-89'], '#00E676',       '#000'),
+                ('Pasable',      '55–74', stats.rangos['55-74'], '#FFEA00',       '#000'),
+                ('Floja',        '35–54', stats.rangos['35-54'], '#FF9100',       '#000'),
+                ('Desastre',     '0–34',  stats.rangos['0-34'],  '#FF1744',       '#fff'),
+            ] %}
+            {% set max_dist = [stats.rangos.values()|max, 1]|max %}
+            <div class="hbar-wrap">
+            {% for label, rango, val, color, tcolor in dist %}
+            <div class="hbar-row">
+                <span class="hbar-label hbar-label-dist" title="{{ rango }}">
+                    <span style="color:{{ color }}; font-size:0.65rem; font-weight:700;">{{ rango }}</span>
+                    <span style="display:block; font-size:0.72rem;">{{ label }}</span>
+                </span>
+                <div class="hbar-track">
+                    <div class="hbar-fill" style="width:{{ (val/max_dist*100)|int }}%; background:{{ color }}; color:{{ tcolor }};">
+                        {% if val > 0 %}{{ val }}{% endif %}
+                    </div>
+                </div>
+                <span class="hbar-count">{{ val }}</span>
+            </div>
+            {% endfor %}
+            </div>
+            {% else %}<p class="text-muted small mt-auto">Sin películas calificadas aún.</p>{% endif %}
+        </div>
+    </div>
+
+    <!-- Géneros más vistos -->
+    <div class="col-md-7">
+        <div class="stat-card p-4 h-100 shadow-sm d-flex flex-column">
+            <p class="section-title">🎭 Géneros más vistos <small class="text-muted" style="font-size:0.6rem; text-transform:none; letter-spacing:0;">(género principal)</small></p>
+            {% if stats.top_generos %}
+            {% set max_g = stats.top_generos[0][1] %}
+            <div class="hbar-wrap">
+            {% for genero, cant in stats.top_generos %}
+            <div class="hbar-row">
+                <span class="hbar-label">{{ genero }}</span>
+                <div class="hbar-track">
+                    <div class="hbar-fill" style="width:{{ (cant/max_g*100)|int }}%; background:var(--accent); color:#000;">{{ cant }}</div>
+                </div>
+                <span class="hbar-count">{{ cant }}</span>
+            </div>
+            {% endfor %}
+            </div>
+            {% else %}<p class="text-muted small mt-auto">Sin datos de géneros aún.</p>{% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ---- Flip card ----
+    let flipped = false;
+    function toggleFlip() {
+        flipped = !flipped;
+        document.getElementById('flipCard').classList.toggle('flipped', flipped);
+    }
+
+    // ---- Gráfico anual lineal ----
+    const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+    const rawMeses = {{ stats.meses | tojson }};
+    const mesData = {};
+    rawMeses.forEach(([key, cnt]) => {
+        const [yr, mo] = key.split('-');
+        if (!mesData[yr]) mesData[yr] = {};
+        mesData[yr][mo] = cnt;
+    });
+
+    const years = Object.keys(mesData).sort();
+    let currentIdx = years.length - 1;
+
+    function renderChart(year) {
+        const data = mesData[year] || {};
+        const counts = Array.from({length: 12}, (_, i) => data[String(i + 1).padStart(2, '0')] || 0);
+        const max = Math.max(...counts, 1);
+
+        document.getElementById('yearLabel').textContent = year;
+        document.getElementById('prevYear').disabled = currentIdx === 0;
+        document.getElementById('nextYear').disabled = currentIdx === years.length - 1;
+
+        // Dimensiones lógicas del SVG
+        const W = 600, H = 130, padL = 20, padR = 10, padT = 18, padB = 28;
+        const chartW = W - padL - padR;
+        const chartH = H - padT - padB;
+
+        // Calcula coordenadas de cada punto
+        const pts = counts.map((cnt, i) => ({
+            x: padL + (i / 11) * chartW,
+            y: padT + (1 - cnt / max) * chartH,
+            cnt
+        }));
+
+        // Polyline path
+        const polyline = pts.map(p => `${p.x},${p.y}`).join(' ');
+
+        // Área rellena bajo la línea
+        const areaPath = `M${pts[0].x},${padT + chartH} ` +
+            pts.map(p => `L${p.x},${p.y}`).join(' ') +
+            ` L${pts[11].x},${padT + chartH} Z`;
+
+        // Líneas de guía horizontales (3 niveles)
+        const gridLines = [0.25, 0.5, 0.75, 1].map(f => {
+            const gy = padT + (1 - f) * chartH;
+            const val = Math.round(f * max);
+            return `<line x1="${padL}" y1="${gy}" x2="${padL + chartW}" y2="${gy}"
+                          stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+                    <text x="${padL - 4}" y="${gy + 3.5}" text-anchor="end"
+                          fill="rgba(255,255,255,0.25)" font-size="8">${val}</text>`;
+        }).join('');
+
+        // Labels de meses
+        const labels = pts.map((p, i) =>
+            `<text x="${p.x}" y="${padT + chartH + 14}" text-anchor="middle"
+                   fill="rgba(255,255,255,0.4)" font-size="9">${MONTHS[i]}</text>`
+        ).join('');
+
+        // Puntos y tooltips
+        const dots = pts.map(p => {
+            const r = p.cnt > 0 ? 4 : 2.5;
+            const fill = p.cnt > 0 ? 'var(--accent)' : 'rgba(255,255,255,0.15)';
+            const label = p.cnt > 0
+                ? `<text x="${p.x}" y="${p.y - 8}" text-anchor="middle"
+                         fill="var(--accent)" font-size="9" font-weight="700">${p.cnt}</text>`
+                : '';
+            return `${label}<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}"/>`;
+        }).join('');
+
+        const accentColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--accent').trim() || '#00e5ff';
+
+        document.getElementById('yearChartWrap').innerHTML = `
+        <svg class="line-chart-svg" viewBox="0 0 ${W} ${H}">
+            <defs>
+                <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="${accentColor}" stop-opacity="0.18"/>
+                    <stop offset="100%" stop-color="${accentColor}" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
+            ${gridLines}
+            <path d="${areaPath}" fill="url(#lineGrad)"/>
+            <polyline points="${polyline}" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            ${dots}
+            ${labels}
+        </svg>`;
+    }
+
+    function changeYear(dir) {
+        currentIdx = Math.max(0, Math.min(years.length - 1, currentIdx + dir));
+        renderChart(years[currentIdx]);
+    }
+
+    if (years.length > 0) {
+        renderChart(years[currentIdx]);
+    } else {
+        document.getElementById('yearLabel').textContent = '—';
+        document.getElementById('prevYear').disabled = true;
+        document.getElementById('nextYear').disabled = true;
+        document.getElementById('yearChartWrap').innerHTML =
+            '<p class="text-muted small text-center py-3">Sin actividad registrada.</p>';
+    }
+</script>
+{% endblock %}

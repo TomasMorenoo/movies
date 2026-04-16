@@ -54,6 +54,7 @@
                 {% if session.get('username') %}
                     
                     <a class="btn btn-outline-info btn-sm px-3 rounded-pill fw-bold shadow-sm" href="{{ url_for('oracle') }}">👁️ Oráculo</a>
+                    <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm d-none d-md-inline-block" href="{{ url_for('stats') }}">📊 Stats</a>
                     <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm" href="{{ url_for('form') }}">Nueva</a>
                     
                     <div class="nav-item dropdown ms-2" style="list-style: none;">
