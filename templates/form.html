@@ -162,5 +162,16 @@
             evt.preventDefault(); scrollContainer.scrollLeft += evt.deltaY * 2;
         });
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    const inputFecha = document.getElementById('inputFecha');
+    
+    const hoy = new Date();
+    
+    const tzOffset = hoy.getTimezoneOffset() * 60000;
+    const fechaLocal = new Date(hoy - tzOffset).toISOString().split('T')[0];
+    
+    inputFecha.value = fechaLocal;
+});
 </script>
 {% endblock %}
