@@ -52,10 +52,22 @@
                   transition: border-color 0.2s, color 0.2s; margin: 0 auto; }
     .flip-btn:hover { border-color: var(--accent); color: var(--accent); }
     .flip-arrow { font-size: 1rem; }
+
+    /* ---- KPIs mobile: 3 columnas en mobile, 6 en desktop ---- */
+    @media (max-width: 575px) {
+        .kpi-value { font-size: 1.3rem; }
+        .kpi-col { flex: 0 0 33.333%; max-width: 33.333%; }
+    }
+
+    /* ---- Header mobile ---- */
+    @media (max-width: 575px) {
+        .stats-header { flex-direction: column; align-items: flex-start !important; gap: 10px; }
+        .stats-header a { align-self: flex-start; }
+    }
 </style>
 
 <!-- ══════════════ KPIs ══════════════ -->
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 stats-header">
     <h3 class="fw-bold m-0">📊 Mis Estadísticas</h3>
     <a href="{{ url_for('index') }}" class="btn btn-custom-outline btn-sm rounded-pill px-3">← Volver</a>
 </div>
@@ -70,17 +82,17 @@
         (stats.total_pendientes,  'Watchlist',      '#FF9100'),
     ] %}
     {% for val, lbl, color in kpis %}
-    <div class="col-4 col-md-2">
-        <div class="stat-card text-center p-3 h-100 d-flex flex-column justify-content-center shadow-sm">
-            <div class="kpi-value" style="color:{{ color }}; font-size:1.6rem;">{{ val }}</div>
-            <small class="text-muted text-uppercase fw-bold" style="font-size:0.6rem; letter-spacing:1px;">{{ lbl }}</small>
+    <div class="col-4 col-md-2 kpi-col">
+        <div class="stat-card text-center p-2 p-md-3 h-100 d-flex flex-column justify-content-center shadow-sm">
+            <div class="kpi-value" style="color:{{ color }};">{{ val }}</div>
+            <small class="text-muted text-uppercase fw-bold" style="font-size:0.58rem; letter-spacing:1px;">{{ lbl }}</small>
         </div>
     </div>
     {% endfor %}
 </div>
 
 <!-- ══════════════ GRÁFICO ANUAL (ancho completo) ══════════════ -->
-<div class="stat-card p-4 mb-4 shadow-sm">
+<div class="stat-card p-3 p-md-4 mb-4 shadow-sm">
     <p class="section-title m-0 mb-1">📅 Actividad anual</p>
     <div class="year-nav">
         <button id="prevYear" onclick="changeYear(-1)">←</button>
@@ -94,8 +106,8 @@
 <div class="row g-4 mb-4">
 
     <!-- Plataformas -->
-    <div class="col-md-4">
-        <div class="stat-card p-4 h-100 shadow-sm d-flex flex-column">
+    <div class="col-12 col-md-4">
+        <div class="stat-card p-3 p-md-4 h-100 shadow-sm d-flex flex-column">
             <p class="section-title">📺 Plataformas favoritas</p>
             {% if stats.top_plataformas %}
             {% set max_p = stats.top_plataformas[0][1] %}
@@ -115,8 +127,8 @@
     </div>
 
     <!-- Mejor / Peor  ←→  Primera / Última -->
-    <div class="col-md-4">
-        <div class="stat-card p-4 h-100 shadow-sm">
+    <div class="col-12 col-md-4">
+        <div class="stat-card p-3 p-md-4 h-100 shadow-sm">
             {% if stats.mejor %}
             <div class="flip-card" id="flipCard">
                 <div class="flip-inner" id="flipInner">
@@ -196,8 +208,8 @@
     </div>
 
     <!-- Directores -->
-    <div class="col-md-4">
-        <div class="stat-card p-4 h-100 shadow-sm d-flex flex-column">
+    <div class="col-12 col-md-4">
+        <div class="stat-card p-3 p-md-4 h-100 shadow-sm d-flex flex-column">
             <p class="section-title">🎬 Directores más vistos</p>
             {% if stats.top_directores %}
             {% set max_d = stats.top_directores[0][1] %}
@@ -222,8 +234,8 @@
 <div class="row g-4 mb-4">
 
     <!-- Distribución de puntuaciones -->
-    <div class="col-md-5">
-        <div class="stat-card p-4 h-100 shadow-sm d-flex flex-column">
+    <div class="col-12 col-md-5">
+        <div class="stat-card p-3 p-md-4 h-100 shadow-sm d-flex flex-column">
             <p class="section-title">⭐ Distribución de puntuaciones</p>
             {% if stats.total_calificadas > 0 %}
             {% set dist = [
@@ -256,8 +268,8 @@
     </div>
 
     <!-- Géneros más vistos -->
-    <div class="col-md-7">
-        <div class="stat-card p-4 h-100 shadow-sm d-flex flex-column">
+    <div class="col-12 col-md-7">
+        <div class="stat-card p-3 p-md-4 h-100 shadow-sm d-flex flex-column">
             <p class="section-title">🎭 Géneros más vistos <small class="text-muted" style="font-size:0.6rem; text-transform:none; letter-spacing:0;">(género principal)</small></p>
             {% if stats.top_generos %}
             {% set max_g = stats.top_generos[0][1] %}
@@ -309,27 +321,22 @@
         document.getElementById('prevYear').disabled = currentIdx === 0;
         document.getElementById('nextYear').disabled = currentIdx === years.length - 1;
 
-        // Dimensiones lógicas del SVG
         const W = 600, H = 130, padL = 20, padR = 10, padT = 18, padB = 28;
         const chartW = W - padL - padR;
         const chartH = H - padT - padB;
 
-        // Calcula coordenadas de cada punto
         const pts = counts.map((cnt, i) => ({
             x: padL + (i / 11) * chartW,
             y: padT + (1 - cnt / max) * chartH,
             cnt
         }));
 
-        // Polyline path
         const polyline = pts.map(p => `${p.x},${p.y}`).join(' ');
 
-        // Área rellena bajo la línea
         const areaPath = `M${pts[0].x},${padT + chartH} ` +
             pts.map(p => `L${p.x},${p.y}`).join(' ') +
             ` L${pts[11].x},${padT + chartH} Z`;
 
-        // Líneas de guía horizontales (3 niveles)
         const gridLines = [0.25, 0.5, 0.75, 1].map(f => {
             const gy = padT + (1 - f) * chartH;
             const val = Math.round(f * max);
@@ -339,13 +346,11 @@
                           fill="rgba(255,255,255,0.25)" font-size="8">${val}</text>`;
         }).join('');
 
-        // Labels de meses
         const labels = pts.map((p, i) =>
             `<text x="${p.x}" y="${padT + chartH + 14}" text-anchor="middle"
                    fill="rgba(255,255,255,0.4)" font-size="9">${MONTHS[i]}</text>`
         ).join('');
 
-        // Puntos y tooltips
         const dots = pts.map(p => {
             const r = p.cnt > 0 ? 4 : 2.5;
             const fill = p.cnt > 0 ? 'var(--accent)' : 'rgba(255,255,255,0.15)';

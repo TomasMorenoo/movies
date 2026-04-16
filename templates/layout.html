@@ -21,9 +21,11 @@
             --text-muted: #A0A0A0;   
         }
         body { background-color: var(--bg-main); color: var(--text-main); font-family: 'Poppins', sans-serif; -webkit-font-smoothing: antialiased; }
+        
         .navbar-custom { background-color: rgba(18, 18, 18, 0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 1rem 0; }
         .navbar-brand { font-weight: 700; letter-spacing: 1.5px; font-size: 1.5rem; color: var(--text-main) !important; }
         .navbar-brand span { color: var(--accent); }
+        
         .btn-custom-outline { border: 1px solid rgba(255, 255, 255, 0.2); color: var(--text-main); transition: all 0.3s ease; font-weight: 600; }
         .btn-custom-outline:hover { border-color: var(--accent); background: rgba(0, 229, 255, 0.1); color: var(--accent); }
         .btn-accent { background-color: var(--accent); color: #000; border: none; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.2); }
@@ -34,53 +36,126 @@
         .text-muted { color: var(--text-muted) !important; }
         .text-warning { color: var(--accent) !important; }
         
-        /* Oculta la flechita por defecto del menú desplegable */
+        /* Avatar menú */
         .hide-toggle::after { display: none !important; }
-        
-        /* Estilos para el menú desplegable oscuro */
         .dropdown-menu-custom { background-color: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.1); }
         .dropdown-item { color: var(--text-main); transition: background 0.2s; }
         .dropdown-item:hover { background-color: rgba(255, 255, 255, 0.05); color: var(--accent); }
+
+        /* Hamburger button */
+        .navbar-toggler-custom {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: transparent;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .navbar-toggler-custom:hover { border-color: var(--accent); }
+        .navbar-toggler-custom .bar {
+            display: block;
+            width: 22px;
+            height: 2px;
+            background: var(--text-main);
+            margin: 5px 0;
+            border-radius: 2px;
+            transition: background 0.2s;
+        }
+        .navbar-toggler-custom:hover .bar { background: var(--accent); }
+
+        /* Mobile menu panel */
+        .mobile-menu {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            padding: 1rem 0 0.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            margin-top: 0.75rem;
+        }
+        .mobile-menu.open { display: flex; }
+        .mobile-menu .mobile-user-header {
+            text-align: center;
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 4px;
+        }
+        .mobile-menu a {
+            width: 100%;
+            text-align: center;
+        }
+        .mobile-menu .mobile-link {
+            display: block;
+            padding: 10px;
+            color: var(--text-main);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background 0.2s, color 0.2s;
+            font-weight: 500;
+        }
+        .mobile-menu .mobile-link:hover { background: rgba(255,255,255,0.05); color: var(--accent); }
+        .mobile-menu .mobile-link.danger { color: #ff6b6b; }
+        .mobile-menu .mobile-link.danger:hover { background: rgba(255, 107, 107, 0.1); }
     </style>
     <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }</script>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-custom mb-5 sticky-top">
-        <div class="container d-flex justify-content-between align-items-center">
-            
-            <a class="navbar-brand m-0" href="{{ url_for('index') }}">Mobatai<span>Vault</span></a>
-            
-            <div class="d-flex gap-2 align-items-center">
+    <nav class="navbar-custom sticky-top mb-5">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                
+                <a class="navbar-brand m-0" href="{{ url_for('index') }}">Mobatai<span>Vault</span></a>
+                
                 {% if session.get('username') %}
+                <div class="d-flex gap-2 align-items-center">
                     
-                    <a class="btn btn-outline-info btn-sm px-3 rounded-pill fw-bold shadow-sm" href="{{ url_for('oracle') }}">👁️ Oráculo</a>
+                    <!-- Desktop: links visibles en md+ -->
+                    <a class="btn btn-outline-info btn-sm px-3 rounded-pill fw-bold shadow-sm d-none d-md-inline-block" href="{{ url_for('oracle') }}">👁️ Oráculo</a>
                     <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm d-none d-md-inline-block" href="{{ url_for('stats') }}">📊 Stats</a>
-                    <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm" href="{{ url_for('form') }}">Nueva</a>
-                    
-                    <div class="nav-item dropdown ms-2" style="list-style: none;">
+                    <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm d-none d-md-inline-block" href="{{ url_for('form') }}">Nueva</a>
+
+                    <!-- Avatar dropdown (desktop) -->
+                    <div class="nav-item dropdown ms-2 d-none d-md-block" style="list-style: none;">
                         <a class="nav-link dropdown-toggle hide-toggle d-flex align-items-center p-0" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="text-decoration: none;">
-                            
                             <div class="rounded-circle bg-info text-dark d-flex align-items-center justify-content-center fw-bold shadow" style="width: 40px; height: 40px; font-size: 1.1rem; border: 2px solid var(--accent);">
                                 {{ session.get('username', 'US')[:2] | upper }}
                             </div>
                         </a>
-                        
                         <ul class="dropdown-menu dropdown-menu-end dropdown-menu-custom shadow-lg mt-3" aria-labelledby="userMenu">
                             <li>
                                 <span class="dropdown-item-text text-info fw-bold border-bottom border-secondary pb-2 mb-2 d-block text-center">
                                     Hola, {{ session.get('username') }}
                                 </span>
                             </li>
-                            
                             <li><a class="dropdown-item py-2" href="{{ url_for('export_csv') }}">📥 Exportar a CSV</a></li>
                             <li><hr class="dropdown-divider border-secondary"></li>
                             <li><a class="dropdown-item text-danger py-2 fw-bold" href="{{ url_for('logout') }}">🚪 Salir</a></li>
                         </ul>
                     </div>
-                    
+
+                    <!-- Hamburger (mobile) -->
+                    <button class="navbar-toggler-custom d-md-none" id="mobileToggle" aria-label="Abrir menú">
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                    </button>
+                </div>
                 {% endif %}
             </div>
-            
+
+            <!-- Mobile menu panel -->
+            {% if session.get('username') %}
+            <div class="mobile-menu d-md-none" id="mobileMenu">
+                <div class="mobile-user-header">👤 {{ session.get('username') }}</div>
+                <a class="mobile-link" href="{{ url_for('oracle') }}">👁️ Oráculo</a>
+                <a class="mobile-link" href="{{ url_for('stats') }}">📊 Stats</a>
+                <a class="mobile-link" href="{{ url_for('form') }}">✏️ Nueva entrada</a>
+                <a class="mobile-link" href="{{ url_for('export_csv') }}">📥 Exportar a CSV</a>
+                <a class="mobile-link danger" href="{{ url_for('logout') }}">🚪 Salir</a>
+            </div>
+            {% endif %}
         </div>
     </nav>
     
@@ -89,5 +164,14 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const toggle = document.getElementById('mobileToggle');
+        const menu = document.getElementById('mobileMenu');
+        if (toggle && menu) {
+            toggle.addEventListener('click', () => {
+                menu.classList.toggle('open');
+            });
+        }
+    </script>
 </body>
 </html>

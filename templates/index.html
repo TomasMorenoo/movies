@@ -10,16 +10,26 @@
     .controls-container { background-color: var(--bg-card); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,255,255,0.05); }
     .form-select, .search-input { background-color: #121212; border: 1px solid rgba(255,255,255,0.1); color: white; }
     .form-select:focus, .search-input:focus { border-color: var(--accent); box-shadow: none; color: white; background-color: #121212; }
-    .nav-tabs .nav-link { color: var(--text-muted); border: none; }
-    .nav-tabs .nav-link.active { color: var(--accent) !important; background: transparent; border-bottom: 2px solid var(--accent); }
     .movie-card:hover .badge-score, .movie-card.touch-active .badge-score { opacity: 0; }
     .opinion-scroll { max-height: 65px; overflow-y: auto; text-align: left; padding-right: 5px; font-size: 0.75rem; }
     .opinion-scroll::-webkit-scrollbar { width: 4px; }
     .opinion-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
     .opinion-scroll::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
-    /* Buscador activo en todas las tabs */
     .search-active-hint { font-size: 0.72rem; color: var(--accent); display: none; margin-top: 4px; }
     .search-active-hint.visible { display: block; }
+
+    /* ---- Tabs responsive ---- */
+    .nav-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tabs .nav-item { flex-shrink: 0; }
+    .nav-tabs .nav-link { color: var(--text-muted); border: none; white-space: nowrap; padding: 0.5rem 0.85rem; font-size: 0.85rem; }
+    .nav-tabs .nav-link.active { color: var(--accent) !important; background: transparent; border-bottom: 2px solid var(--accent); }
+
+    /* ---- Stats cards mobile ---- */
+    @media (max-width: 575px) {
+        .stat-value { font-size: 1.4rem; }
+        .stat-card { padding: 0.6rem !important; }
+    }
 </style>
 
 {# volver_a_ver se calcula en el loop directamente #}
@@ -47,11 +57,11 @@
 
 <div class="controls-container mb-3 shadow-sm">
     <div class="row g-2">
-        <div class="col-md-8">
+        <div class="col-12 col-md-8">
             <input type="text" id="liveSearch" class="form-control search-input" placeholder="🔍 Buscar en toda tu bóveda...">
             <div class="search-active-hint" id="searchHint">Buscando en todas las secciones</div>
         </div>
-        <div class="col-md-4">
+        <div class="col-12 col-md-4">
             <select id="sortSelect" class="form-select">
                 <option value="date-desc" selected>📅 Más Recientes</option>
                 <option value="date-asc">📅 Más Antiguas</option>
@@ -62,7 +72,7 @@
     </div>
 </div>
 
-<ul class="nav nav-tabs mb-4 border-secondary" id="myTab" role="tablist">
+<ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link active fw-bold" id="coleccion-tab" data-bs-toggle="tab" data-bs-target="#coleccion" type="button" role="tab">
             Mi Colección
@@ -287,9 +297,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const searchHint  = document.getElementById('searchHint');
     const noResults   = document.getElementById('noResultsMsg');
 
-    // Todos los items de todas las tabs
     const getAll = () => Array.from(document.querySelectorAll('.all-item'));
-    // Solo los de la colección (para sort)
     const getColeccion = () => Array.from(document.querySelectorAll('#moviesGrid .movie-item'));
 
     // ---- BÚSQUEDA GLOBAL ----
@@ -297,7 +305,6 @@ document.addEventListener("DOMContentLoaded", function() {
         const term = this.value.toLowerCase().trim();
 
         if (term === '') {
-            // Sin búsqueda: restauramos visibilidad normal, ocultamos hint
             getAll().forEach(item => { item.style.display = 'block'; });
             searchHint.classList.remove('visible');
             noResults.classList.add('d-none');
