@@ -115,6 +115,7 @@
                     <!-- Desktop: links visibles en md+ -->
                     <a class="btn btn-outline-info btn-sm px-3 rounded-pill fw-bold shadow-sm d-none d-md-inline-block" href="{{ url_for('oracle') }}">👁️ Oráculo</a>
                     <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm d-none d-md-inline-block" href="{{ url_for('stats') }}">📊 Stats</a>
+                    <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm d-none d-md-inline-block" href="{{ url_for('top10') }}">🏆 Top 10</a>
                     <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm d-none d-md-inline-block" href="{{ url_for('form') }}">Nueva</a>
 
                     <!-- Avatar dropdown (desktop) -->
@@ -152,6 +153,7 @@
                 <div class="mobile-user-header">👤 {{ session.get('username') }}</div>
                 <a class="mobile-link" href="{{ url_for('oracle') }}">👁️ Oráculo</a>
                 <a class="mobile-link" href="{{ url_for('stats') }}">📊 Stats</a>
+                <a class="mobile-link" href="{{ url_for('top10') }}">🏆 Top 10</a>
                 <a class="mobile-link" href="{{ url_for('form') }}">✏️ Nueva entrada</a>
                 <a class="mobile-link" href="{{ url_for('export_csv') }}">📥 Exportar a CSV</a>
                 <a class="mobile-link danger" href="{{ url_for('logout') }}">🚪 Salir</a>

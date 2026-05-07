@@ -20,7 +20,10 @@ db.init_app(app)
 
 # Crea las tablas (User y Movie) automáticamente si no existen
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception:
+        pass
 
 # --- RUTAS PWA ---
 @app.route('/manifest.json')
@@ -150,6 +153,15 @@ def index():
     stats = {'total': len(vistas), 'promedio': promedio, 'plataforma': plataforma_fav}
     
     return render_template('index.html', peliculas=vistas, pendientes=pendientes, stats=stats)
+
+@app.route('/dashboard/top10')
+def top10():
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+    peliculas = Movie.query.filter_by(user_id=session['user_id'])\
+        .filter(Movie.rating.isnot(None), Movie.is_watchlist == False, Movie.abandoned == False)\
+        .order_by(Movie.rating.desc()).limit(10).all()
+    return render_template('top10.html', peliculas=peliculas, username=session.get('username'))
 
 @app.route('/dashboard/stats')
 def stats():

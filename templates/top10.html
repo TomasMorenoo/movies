@@ -1,0 +1,97 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    .top10-header { text-align: center; margin-bottom: 1.5rem; }
+    .top10-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .top10-card { position: relative; border-radius: 10px; overflow: hidden; aspect-ratio: 2/3;
+                  background: var(--bg-card); }
+    .top10-poster { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .top10-overlay { position: absolute; bottom: 0; left: 0; right: 0;
+                     background: linear-gradient(transparent, rgba(0,0,0,0.92));
+                     padding: 28px 8px 8px; }
+    .top10-rank { position: absolute; top: 7px; left: 7px; background: var(--accent); color: #000;
+                  font-weight: 800; font-size: 0.75rem; border-radius: 6px; padding: 2px 7px; }
+    .top10-score { position: absolute; top: 7px; right: 7px; background: rgba(0,0,0,0.75);
+                   color: var(--accent); font-weight: 700; font-size: 0.75rem;
+                   border-radius: 6px; padding: 2px 7px; border: 1px solid var(--accent); }
+    .top10-title { color: #fff; font-size: 0.72rem; font-weight: 600; line-height: 1.2;
+                   margin: 0; text-align: center; }
+
+    /* Zona de captura — fondo sólido para la imagen */
+    #top10-capture {
+        background: #121212;
+        border-radius: 16px;
+        padding: 20px;
+    }
+    .capture-header { text-align: center; margin-bottom: 16px; }
+    .capture-header h2 { color: var(--accent); font-weight: 800; font-size: 1.4rem; margin: 0; }
+    .capture-header small { color: #666; font-size: 0.72rem; letter-spacing: 1px; }
+
+    @media (max-width: 767px) {
+        .top10-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold m-0">🏆 Mi Top 10</h3>
+    <div class="d-flex gap-2">
+        <button id="btn-download" class="btn btn-accent rounded-pill px-4 fw-bold">
+            📸 Descargar imagen
+        </button>
+        <a href="{{ url_for('index') }}" class="btn btn-custom-outline btn-sm rounded-pill px-3">← Volver</a>
+    </div>
+</div>
+
+<div id="top10-capture">
+    <div class="capture-header">
+        <h2>🏆 Mi Top 10</h2>
+        <small>@{{ username }} · MobataiVault</small>
+    </div>
+
+    {% if peliculas %}
+    <div class="top10-grid">
+        {% for p in peliculas %}
+        <div class="top10-card">
+            <img class="top10-poster"
+                 src="{{ 'https://image.tmdb.org/t/p/w500' + p.poster_path if p.poster_path else '/static/mbvault-512.png' }}"
+                 alt="{{ p.title }}"
+                 crossorigin="anonymous">
+            <div class="top10-rank">#{{ loop.index }}</div>
+            <div class="top10-score">★ {{ p.rating }}</div>
+            <div class="top10-overlay">
+                <p class="top10-title">{{ p.title }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted text-center py-5">Todavía no tenés películas calificadas.</p>
+    {% endif %}
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+    document.getElementById('btn-download').addEventListener('click', () => {
+        const btn = document.getElementById('btn-download');
+        btn.textContent = '⏳ Generando...';
+        btn.disabled = true;
+
+        html2canvas(document.getElementById('top10-capture'), {
+            backgroundColor: '#121212',
+            scale: 2,
+            useCORS: true,
+            allowTaint: false
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'mi-top10-mobatai.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            btn.textContent = '📸 Descargar imagen';
+            btn.disabled = false;
+        }).catch(() => {
+            btn.textContent = '📸 Descargar imagen';
+            btn.disabled = false;
+        });
+    });
+</script>
+{% endblock %}

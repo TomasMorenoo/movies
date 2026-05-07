@@ -7,6 +7,18 @@ import time
 with app.app_context():
     print("Iniciando protocolo de actualización de base de datos...")
 
+    try:
+        db.session.execute(text("DROP SEQUENCE IF EXISTS oracle_blacklist_id_seq CASCADE"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        db.create_all()
+        print("✅ Tablas verificadas.")
+    except Exception as e:
+        print(f"⚠️  create_all: {e}")
+
     for col_sql, col_name in [
         ("ALTER TABLE movie ADD COLUMN imdb_score VARCHAR(10)", "imdb_score"),
         ("ALTER TABLE movie ADD COLUMN runtime INTEGER", "runtime"),
