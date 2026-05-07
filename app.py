@@ -390,27 +390,27 @@ def oracle():
     if ya_mostradas:
         excluir_str = f"\n\nPelículas que YA recomendé antes (NO repetir ninguna, ni siquiera el bonus): {', '.join(ya_mostradas)}."
 
-    prompt = f"""Actuá como un crítico y curador cinéfilo con criterio moderno y personalidad propia.
+    prompt = f"""Actua como un critico y curador cinefilo con criterio moderno y personalidad propia.
 
 Mi historial completo:
 {reporte_peliculas}{excluir_str}
 
-REGLA FUNDAMENTAL: No recomendés ninguna película que aparezca en el historial anterior bajo ningún nombre alternativo, traducción o variante del título.
+REGLA FUNDAMENTAL: No recomiendes ninguna pelicula que aparezca en el historial anterior. Los titulos pueden estar en español, ingles u otro idioma, con o sin año entre parentesis, y son la misma pelicula. Si el titulo es parecido Y comparte director o elenco con alguna del historial, tratalos como la misma pelicula y no la recomiendes. Ante cualquier duda, descartala.
 
-Tu respuesta tiene DOS secciones dentro de un único objeto JSON:
+Tu respuesta tiene DOS secciones dentro de un unico objeto JSON:
 
-1. "perfil": Analizá mis gustos en 4-6 oraciones directas y honestas. Detectá patrones reales entre mis películas más puntuadas: qué tipo de experiencia busco, qué me engancha, qué me deja frío. Hablame directo, con criterio, sin frases genéricas de crítico de película.
+1. "perfil": Analiza mis gustos en 4-6 oraciones directas y honestas. Detecta patrones reales entre mis peliculas mas puntuadas: que tipo de experiencia busco, que me engancha, que me deja frio. Hablame directo, con criterio, sin frases genericas.
 
-2. "recomendaciones": Array con exactamente {cantidad + 1} elementos. Los primeros {cantidad} son recomendaciones precisas basadas en el perfil que construiste (bonus:false). El último es el BONUS SALVAJE (bonus:true): una película fuera de mis gustos habituales pero imprescindible, sin cine experimental ni de nicho. En cada "justificacion" escribí 2-3 oraciones específicas y directas, sin frases de relleno.
+2. "recomendaciones": Array con exactamente {cantidad + 1} elementos. Los primeros {cantidad} son recomendaciones precisas basadas en el perfil que construiste (bonus:false). El ultimo es el BONUS SALVAJE (bonus:true): una pelicula fuera de mis gustos habituales pero imprescindible, sin cine experimental ni de nicho. En cada "justificacion" escribi 2-3 oraciones especificas y directas, sin frases de relleno.
 
-Devuelve ÚNICAMENTE este objeto JSON válido, sin texto adicional ni markdown:
+Devuelve UNICAMENTE este objeto JSON valido, sin texto adicional ni markdown:
 {{
-  "perfil": "Tu análisis del espectador.",
+  "perfil": "Tu analisis del espectador.",
   "recomendaciones": [
-    {{"titulo": "Título Original", "anio": "YYYY", "justificacion": "Por qué la recomendás.", "bonus": false}},
-    {{"titulo": "Título Original", "anio": "YYYY", "justificacion": "Por qué es imprescindible.", "bonus": true}}
+    {{"titulo": "Titulo Original", "anio": "YYYY", "justificacion": "Por que la recomendas.", "bonus": false}},
+    {{"titulo": "Titulo Original", "anio": "YYYY", "justificacion": "Por que es imprescindible.", "bonus": true}}
   ]
-}}
+}}"""
 
     try:
         groq_key = os.getenv('GROQ_API_KEY')
@@ -492,27 +492,27 @@ def oracle_prompt():
         else:
             historial.append(f"'{p.title}' (Vista)")
     lineas = "\n".join(historial)
-    prompt = f"""Actuá como un crítico y curador cinéfilo con criterio moderno y personalidad propia.
-Analizá mi historial y detectá patrones reales de gustos (temáticas, tono, narrativa, ritmo, complejidad, impacto emocional y estilo visual).
+    prompt = f"""Actua como un critico y curador cinefilo con criterio moderno y personalidad propia.
+Analiza mi historial y detecta patrones reales de gustos (tematicas, tono, narrativa, ritmo, complejidad, impacto emocional y estilo visual).
 
-Películas:
+Peliculas:
 {lineas}
+
+REGLA FUNDAMENTAL: No recomiendes ninguna pelicula que aparezca en el historial. Los titulos pueden estar en español o ingles, con o sin año. Si el titulo es parecido Y comparte director o elenco, tratalos como la misma pelicula.
 
 Tu respuesta tiene DOS partes:
 
 PARTE 1:
-Recomendame exactamente 3 películas que no estén en la lista anterior y que encajen MUY bien con mis gustos.
-Evitá recomendaciones genéricas o excesivamente obvias.
-Priorizá películas que realmente conecten con lo que disfruto y explicá específicamente por qué.
+Recomendame exactamente 3 peliculas que no esten en la lista anterior y que encajen MUY bien con mis gustos.
+Evita recomendaciones genericas. Explica especificamente por que cada una conecta conmigo.
 
-PARTE 2 — BONUS SALVAJE:
-Recomendame UNA sola película fuera de mis gustos habituales, pero que consideres una experiencia cinematográfica imprescindible.
-No busco cine experimental ni películas "de nicho".
-Busco una película que cualquier persona amante del cine debería ver al menos una vez en la vida, aunque no sea de su género habitual.
+PARTE 2 - BONUS SALVAJE:
+Recomendame UNA sola pelicula fuera de mis gustos habituales pero imprescindible para cualquier amante del cine.
+No cine experimental ni de nicho.
 
-Para cada recomendación indicá: título original, año, director, por qué conecta conmigo (o por qué vale la pena en el bonus), y qué sensación me va a dejar después de verla.
+Para cada recomendacion indica: titulo original, año, director, por que la recomendas y que sensacion deja despues de verla.
 
-No hagas listas genéricas. Priorizá personalidad, precisión y criterio antes que popularidad."""
+No hagas listas genericas. Prioriza personalidad, precision y criterio antes que popularidad."""
     return jsonify({'prompt': prompt})
 
 @app.route('/dashboard/oracle/discard', methods=['POST'])
