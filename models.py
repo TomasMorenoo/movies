@@ -45,3 +45,9 @@ class Movie(db.Model):
 
     def __repr__(self):
         return f'<Movie {self.title}>'
+
+class OracleBlacklist(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    tmdb_id = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(200), nullable=False)

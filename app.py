@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, Response, jsonify
-from models import db, Movie, User
+from models import db, Movie, User, OracleBlacklist
 from tmdb_helper import search_movie, get_movie_details, get_imdb_rating
 import os
 import csv
@@ -366,56 +366,51 @@ def oracle():
     if len(mis_pelis) < 3:
         return jsonify({'error': "El Oráculo necesita más datos. Agregá al menos 3 películas a tu bóveda."})
 
-    # Recibimos cuántas quiere (3 primera vez, 5 segunda vez) y los títulos ya mostrados
     cantidad = int(request.json.get('cantidad', 3)) if request.is_json else 3
     ya_mostradas = request.json.get('ya_mostradas', []) if request.is_json else []
 
     historial = []
     for p in mis_pelis:
         if p.is_watchlist and not p.rating and not p.abandoned:
-            historial.append(f"'{p.title}' (En mi Watchlist - NO RECOMENDAR)")
+            historial.append(f"- {p.title} (Watchlist — NO RECOMENDAR)")
         elif p.abandoned:
-            historial.append(f"'{p.title}' (Abandonada - Odio esto)")
+            historial.append(f"- {p.title} (Abandonada — NO RECOMENDAR)")
         elif p.rating:
-            historial.append(f"'{p.title}' (Puntaje: {p.rating}/100)")
+            historial.append(f"- {p.title} (Puntaje: {p.rating}/100)")
         else:
-            historial.append(f"'{p.title}' (Vista)")
+            historial.append(f"- {p.title} (Vista)")
+
+    blacklist = OracleBlacklist.query.filter_by(user_id=session['user_id']).all()
+    for b in blacklist:
+        historial.append(f"- {b.title} (Descartada — NO RECOMENDAR NUNCA)")
 
     reporte_peliculas = "\n".join(historial)
 
-    # Excluimos las ya mostradas en la consulta anterior
     excluir_str = ""
     if ya_mostradas:
-        excluir_str = f"\nAdemás, en una consulta anterior ya recomendé estas películas, NO las repitas: {', '.join(ya_mostradas)}."
+        excluir_str = f"\n\nPelículas que YA recomendé antes (NO repetir ninguna, ni siquiera el bonus): {', '.join(ya_mostradas)}."
 
     prompt = f"""Actuá como un crítico y curador cinéfilo con criterio moderno y personalidad propia.
-Analizá mi historial y detectá patrones reales de gustos (temáticas, tono, narrativa, ritmo, complejidad, impacto emocional y estilo visual).
 
-Películas:
+Mi historial completo:
 {reporte_peliculas}{excluir_str}
 
-Tu respuesta tiene DOS partes:
+REGLA FUNDAMENTAL: No recomendés ninguna película que aparezca en el historial anterior bajo ningún nombre alternativo, traducción o variante del título.
 
-PARTE 1:
-Recomendame exactamente {cantidad} películas que no estén en la lista anterior y que encajen MUY bien con mis gustos.
-Evitá recomendaciones genéricas o excesivamente obvias.
-Priorizá películas que realmente conecten con lo que disfruto y explicá específicamente por qué.
+Tu respuesta tiene DOS secciones dentro de un único objeto JSON:
 
-PARTE 2 — BONUS SALVAJE:
-Recomendame UNA sola película fuera de mis gustos habituales, pero que consideres una experiencia cinematográfica imprescindible.
-No busco cine experimental ni películas "de nicho".
-Busco una película que cualquier persona amante del cine debería ver al menos una vez en la vida, aunque no sea de su género habitual.
+1. "perfil": Analizá mis gustos en 4-6 oraciones directas y honestas. Detectá patrones reales entre mis películas más puntuadas: qué tipo de experiencia busco, qué me engancha, qué me deja frío. Hablame directo, con criterio, sin frases genéricas de crítico de película.
 
-Para cada recomendación indicá: título original, año, director, por qué conecta conmigo (o por qué vale la pena en el bonus), y qué sensación me va a dejar después de verla.
+2. "recomendaciones": Array con exactamente {cantidad + 1} elementos. Los primeros {cantidad} son recomendaciones precisas basadas en el perfil que construiste (bonus:false). El último es el BONUS SALVAJE (bonus:true): una película fuera de mis gustos habituales pero imprescindible, sin cine experimental ni de nicho. En cada "justificacion" escribí 2-3 oraciones específicas y directas, sin frases de relleno.
 
-No hagas listas genéricas. Priorizá personalidad, precisión y criterio antes que popularidad.
-
-Devuelve ÚNICAMENTE un arreglo JSON válido con esta estructura exacta, sin texto adicional ni formato markdown:
-[
-    {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué conecta + qué sensación deja.", "bonus": false}},
-    {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué es imprescindible + qué sensación deja.", "bonus": true}}
-]
-El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales (bonus: false) y 1 bonus (bonus: true) al final."""
+Devuelve ÚNICAMENTE este objeto JSON válido, sin texto adicional ni markdown:
+{{
+  "perfil": "Tu análisis del espectador.",
+  "recomendaciones": [
+    {{"titulo": "Título Original", "anio": "YYYY", "justificacion": "Por qué la recomendás.", "bonus": false}},
+    {{"titulo": "Título Original", "anio": "YYYY", "justificacion": "Por qué es imprescindible.", "bonus": true}}
+  ]
+}}
 
     try:
         groq_key = os.getenv('GROQ_API_KEY')
@@ -433,7 +428,9 @@ El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales 
         elif texto_limpio.startswith("```"):
             texto_limpio = texto_limpio[3:-3].strip()
 
-        recomendaciones = json.loads(texto_limpio)
+        parsed = json.loads(texto_limpio)
+        perfil = parsed.get('perfil', '') if isinstance(parsed, dict) else ''
+        recomendaciones = parsed.get('recomendaciones', parsed) if isinstance(parsed, dict) else parsed
 
         # ENRIQUECER CON TMDB
         tmdb_api_key = os.getenv('TMDB_API_KEY')
@@ -474,7 +471,7 @@ El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales 
                     'bonus': es_bonus
                 })
 
-        return jsonify({'success': True, 'peliculas': resultados_finales})
+        return jsonify({'success': True, 'peliculas': resultados_finales, 'perfil': perfil})
 
     except Exception as e:
         return jsonify({'error': f"Fallo en la conexión neural: {str(e)}"})
@@ -517,6 +514,19 @@ Para cada recomendación indicá: título original, año, director, por qué con
 
 No hagas listas genéricas. Priorizá personalidad, precisión y criterio antes que popularidad."""
     return jsonify({'prompt': prompt})
+
+@app.route('/dashboard/oracle/discard', methods=['POST'])
+def oracle_discard():
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'error': 'Sesión expirada'})
+    data = request.json
+    tmdb_id = data.get('tmdb_id')
+    titulo = data.get('titulo')
+    existe = OracleBlacklist.query.filter_by(user_id=session['user_id'], tmdb_id=tmdb_id).first()
+    if not existe:
+        db.session.add(OracleBlacklist(user_id=session['user_id'], tmdb_id=tmdb_id, title=titulo))
+        db.session.commit()
+    return jsonify({'success': True})
 
 @app.route('/dashboard/oracle/add_watchlist', methods=['POST'])
 def oracle_add_watchlist():

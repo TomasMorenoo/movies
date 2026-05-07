@@ -108,7 +108,13 @@
     <!-- Resultados -->
     <div id="results-state" class="mt-4 d-none">
       <h5 id="results-title" class="fw-bold mb-1" style="color:var(--accent);"></h5>
-      <p class="text-muted mb-4" style="font-size:0.85rem;" id="results-subtitle"></p>
+      <p class="text-muted mb-3" style="font-size:0.85rem;" id="results-subtitle"></p>
+
+      <div id="perfil-box" class="d-none text-start mb-4 p-3 rounded-3"
+           style="background:rgba(0,229,255,0.05); border:1px solid rgba(0,229,255,0.15); font-size:0.88rem; line-height:1.6; color:var(--text-muted);">
+        <span style="color:var(--accent); font-weight:700; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px;">👤 Tu perfil cinéfilo</span>
+        <p id="perfil-texto" class="mb-0 mt-2"></p>
+      </div>
 
       <div class="oracle-viewport">
         <button class="oracle-arrow" id="btn-prev" onclick="changePage(-1)">←</button>
@@ -149,6 +155,26 @@
         "Cruzando datos con la bóveda de TMDB...",
         "Preparando la revelación final..."
     ];
+
+    async function descartarPeli(tmdbId, titulo, btn) {
+        btn.innerHTML = '⏳';
+        btn.disabled = true;
+        try {
+            const res = await fetch("{{ url_for('oracle_discard') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tmdb_id: tmdbId, titulo })
+            });
+            const data = await res.json();
+            if (data.success) {
+                btn.closest('.oracle-col').style.opacity = '0.35';
+                btn.innerHTML = '✅ Descartada';
+            }
+        } catch(e) {
+            btn.innerHTML = '👎 No me interesa';
+            btn.disabled = false;
+        }
+    }
 
     async function guardarEnWatchlist(tmdbId, titulo, poster, btn) {
         btn.innerHTML = '⏳ Guardando...';
@@ -192,10 +218,14 @@
                  onerror="this.src='/static/mbvault-512.png'">
             <div class="hover-info position-absolute top-0 start-0 w-100 d-flex flex-column justify-content-center align-items-center p-4 text-white" style="height:420px!important;">
               <h4 class="fw-bold text-center" style="color:${hoverColor};">${peli.titulo} (${peli.fecha})</h4>
-              <p class="small mb-4 text-center" style="font-size:0.9rem;overflow-y:auto;max-height:180px;">${peli.sinopsis}</p>
-              <button class="${btnColor} btn rounded-pill fw-bold shadow-lg px-4"
+              <p class="small mb-3 text-center" style="font-size:0.9rem;overflow-y:auto;max-height:160px;">${peli.sinopsis}</p>
+              <button class="${btnColor} btn rounded-pill fw-bold shadow-lg px-4 mb-2"
                       onclick="guardarEnWatchlist('${peli.tmdb_id}','${tituloSafe}','${peli.poster}',this)">
                 ➕ Agregar a Watchlist
+              </button>
+              <button class="btn btn-outline-secondary rounded-pill px-3" style="font-size:0.75rem;"
+                      onclick="descartarPeli('${peli.tmdb_id}','${tituloSafe}',this)">
+                👎 No me interesa
               </button>
             </div>
             <div class="card-body bg-dark text-start d-flex flex-column">
@@ -340,11 +370,16 @@
         }
 
         allCards = data.peliculas;
-        // Guardamos TODOS los títulos (incluyendo bonus) para no repetirlos en la siguiente consulta
         titulosMostrados = allCards.map(p => p.titulo).filter(Boolean);
 
         document.getElementById('results-title').innerText = 'Primera visión del Oráculo';
         document.getElementById('results-subtitle').innerText = '3 recomendaciones para vos + 1 bonus';
+
+        if (data.perfil) {
+            document.getElementById('perfil-texto').innerText = data.perfil;
+            document.getElementById('perfil-box').classList.remove('d-none');
+        }
+
         renderCards();
     });
 
