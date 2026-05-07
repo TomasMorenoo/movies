@@ -199,7 +199,8 @@
               </button>
             </div>
             <div class="card-body bg-dark text-start d-flex flex-column">
-              <h5 class="card-title fw-bold text-center text-white">${peli.titulo}</h5>
+              <h5 class="card-title fw-bold text-center text-white mb-1">${peli.titulo}</h5>
+              ${peli.imdb_score ? `<div class="text-center mb-1" style="font-size:0.78rem; color:#F5C518; font-weight:700;">IMDb ⭐ ${peli.imdb_score}</div>` : ''}
               <hr class="border-secondary">
               <p class="card-text small text-muted flex-grow-1">
                 <span style="color:${labelColor};">${labelText}</span><br>${peli.justificacion}

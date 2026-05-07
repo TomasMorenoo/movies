@@ -418,18 +418,16 @@ Devuelve ÚNICAMENTE un arreglo JSON válido con esta estructura exacta, sin tex
 El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales (bonus: false) y 1 bonus (bonus: true) al final."""
 
     try:
-        gemini_key = os.getenv('GEMINI_API_KEY')
-        gemini_body = {"contents": [{"parts": [{"text": prompt}]}]}
-        models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash']
-        resp = None
-        for model in models:
-            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
-            resp = requests.post(gemini_url, json=gemini_body, timeout=30)
-            if resp.status_code != 429:
-                break
+        groq_key = os.getenv('GROQ_API_KEY')
+        resp = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization': f'Bearer {groq_key}', 'Content-Type': 'application/json'},
+            json={'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': prompt}], 'temperature': 0.8},
+            timeout=30
+        )
         resp.raise_for_status()
 
-        texto_limpio = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+        texto_limpio = resp.json()['choices'][0]['message']['content'].strip()
         if texto_limpio.startswith("```json"):
             texto_limpio = texto_limpio[7:-3].strip()
         elif texto_limpio.startswith("```"):
@@ -450,6 +448,10 @@ El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales 
 
             if tmdb_res.get('results'):
                 peli = tmdb_res['results'][0]
+                details = get_movie_details(peli['id'])
+                imdb_score = None
+                if details and details.get('imdb_id'):
+                    imdb_score = get_imdb_rating(details['imdb_id'])
                 resultados_finales.append({
                     'titulo': peli.get('title'),
                     'poster': f"https://image.tmdb.org/t/p/w500{peli['poster_path']}" if peli.get('poster_path') else poster_fallback,
@@ -457,6 +459,7 @@ El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales 
                     'fecha': peli.get('release_date', '').split('-')[0] if peli.get('release_date') else rec['anio'],
                     'justificacion': rec['justificacion'],
                     'tmdb_id': peli['id'],
+                    'imdb_score': imdb_score,
                     'bonus': es_bonus
                 })
             else:
@@ -467,6 +470,7 @@ El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales 
                     'fecha': rec['anio'],
                     'justificacion': rec['justificacion'],
                     'tmdb_id': '',
+                    'imdb_score': None,
                     'bonus': es_bonus
                 })
 
