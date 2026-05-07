@@ -4,5 +4,4 @@ requests
 python-dotenv
 Werkzeug
 psycopg2-binary
-openai
 jsonify

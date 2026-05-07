@@ -53,6 +53,13 @@
     .flip-btn:hover { border-color: var(--accent); color: var(--accent); }
     .flip-arrow { font-size: 1rem; }
 
+    /* ---- Botones de unidad de tiempo ---- */
+    .unit-btn { background: transparent; border: 1px solid rgba(255,255,255,0.12); color: var(--text-muted);
+                border-radius: 50px; padding: 4px 14px; font-size: 0.78rem; cursor: pointer;
+                transition: border-color 0.2s, color 0.2s, background 0.2s; }
+    .unit-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .unit-btn.active { border-color: var(--accent); color: #000; background: var(--accent); }
+
     /* ---- KPIs mobile: 3 columnas en mobile, 6 en desktop ---- */
     @media (max-width: 575px) {
         .kpi-value { font-size: 1.3rem; }
@@ -90,6 +97,24 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- ══════════════ TIEMPO TOTAL ══════════════ -->
+{% if stats.total_minutos > 0 %}
+<div class="stat-card p-3 p-md-4 mb-4 shadow-sm">
+    <p class="section-title m-0 mb-3">⏱️ Tiempo total viendo películas</p>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+            <div class="kpi-value" id="timeValue" style="font-size:2.4rem;">—</div>
+            <small class="text-muted" id="timeUnit" style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1px;">—</small>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="unit-btn active" data-unit="min" onclick="setUnit('min')">Minutos</button>
+            <button class="unit-btn" data-unit="hrs" onclick="setUnit('hrs')">Horas</button>
+            <button class="unit-btn" data-unit="dias" onclick="setUnit('dias')">Días</button>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- ══════════════ GRÁFICO ANUAL (ancho completo) ══════════════ -->
 <div class="stat-card p-3 p-md-4 mb-4 shadow-sm">
@@ -291,6 +316,21 @@
 </div>
 
 <script>
+    // ---- Tiempo total ----
+    const TOTAL_MIN = {{ stats.total_minutos }};
+    const unitLabels = { min: 'minutos', hrs: 'horas', dias: 'días' };
+
+    function setUnit(unit) {
+        document.querySelectorAll('.unit-btn').forEach(b => b.classList.toggle('active', b.dataset.unit === unit));
+        let val;
+        if (unit === 'min') val = TOTAL_MIN.toLocaleString('es-AR');
+        else if (unit === 'hrs') val = (TOTAL_MIN / 60).toFixed(1).replace('.', ',');
+        else val = (TOTAL_MIN / 1440).toFixed(2).replace('.', ',');
+        document.getElementById('timeValue').textContent = val;
+        document.getElementById('timeUnit').textContent = unitLabels[unit];
+    }
+    setUnit('hrs');
+
     // ---- Flip card ----
     let flipped = false;
     function toggleFlip() {

@@ -5,7 +5,6 @@ import os
 import csv
 from io import StringIO
 from dotenv import load_dotenv
-from openai import OpenAI
 import json
 import requests
 
@@ -220,8 +219,11 @@ def stats():
     primera = con_fecha_sorted[0] if con_fecha_sorted else None
     ultima = con_fecha_sorted[-1] if con_fecha_sorted else None
 
+    total_minutos = sum(p.runtime for p in vistas if p.runtime)
+
     stats_data = {
         'total_vistas': len(vistas),
+        'total_minutos': total_minutos,
         'total_calificadas': len(calificadas),
         'total_abandonadas': len(abandonadas),
         'total_pendientes': len(pendientes),
@@ -280,6 +282,7 @@ def save_movie():
         actores = ''
         generos = ''
         imdb_score = None
+        runtime = None
         
         if details:
             crew = details.get('credits', {}).get('crew', [])
@@ -295,14 +298,14 @@ def save_movie():
             imdb_id = details.get('imdb_id')
             if imdb_id:
                 imdb_score = get_imdb_rating(imdb_id)
+            runtime = details.get('runtime') or None
 
         nueva_peli = Movie(
-            user_id=session['user_id'], # Asocia la peli al usuario creador
+            user_id=session['user_id'],
             tmdb_id=tmdb_id, title=title, poster_path=poster_path,
             rating=rating, platform=platform, opinion=opinion, date_watched=date_watched,
             director=director, genres=generos, cast=actores, imdb_score=imdb_score,
-            is_watchlist=is_watchlist,
-            abandoned=abandoned
+            is_watchlist=is_watchlist, abandoned=abandoned, runtime=runtime
         )
         db.session.add(nueva_peli)
         db.session.commit()
@@ -378,37 +381,50 @@ def oracle():
         else:
             historial.append(f"'{p.title}' (Vista)")
 
-    reporte_peliculas = ", ".join(historial)
+    reporte_peliculas = "\n".join(historial)
 
     # Excluimos las ya mostradas en la consulta anterior
     excluir_str = ""
     if ya_mostradas:
         excluir_str = f"\nAdemás, en una consulta anterior ya recomendé estas películas, NO las repitas: {', '.join(ya_mostradas)}."
 
-    prompt = f"""
-    Eres 'El Oráculo', un experto cinéfilo. Analiza mi historial: {reporte_peliculas}.{excluir_str}
-    Tu respuesta tiene DOS partes:
+    prompt = f"""Actuá como un crítico y curador cinéfilo con criterio moderno y personalidad propia.
+Analizá mi historial y detectá patrones reales de gustos (temáticas, tono, narrativa, ritmo, complejidad, impacto emocional y estilo visual).
 
-    PARTE 1: Recomiéndame exactamente {cantidad} películas que NO estén en ninguna de las listas anteriores, basadas en mis gustos.
+Películas:
+{reporte_peliculas}{excluir_str}
 
-    PARTE 2 (BONUS SALVAJE): Recomiéndame UNA sola película completamente inesperada, que no tenga nada que ver con mis gustos habituales pero que sea una obra que hay que ver al menos una vez en la vida. Marcala con "bonus": true.
+Tu respuesta tiene DOS partes:
 
-    Devuelve ÚNICAMENTE un arreglo JSON válido con esta estructura exacta, sin texto adicional ni formato markdown:
-    [
-        {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué me va a gustar...", "bonus": false}},
-        {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué es imprescindible aunque salga de tu zona de confort.", "bonus": true}}
-    ]
-    El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales (bonus: false) y 1 bonus (bonus: true) al final.
-    """
+PARTE 1:
+Recomendame exactamente {cantidad} películas que no estén en la lista anterior y que encajen MUY bien con mis gustos.
+Evitá recomendaciones genéricas o excesivamente obvias.
+Priorizá películas que realmente conecten con lo que disfruto y explicá específicamente por qué.
+
+PARTE 2 — BONUS SALVAJE:
+Recomendame UNA sola película fuera de mis gustos habituales, pero que consideres una experiencia cinematográfica imprescindible.
+No busco cine experimental ni películas "de nicho".
+Busco una película que cualquier persona amante del cine debería ver al menos una vez en la vida, aunque no sea de su género habitual.
+
+Para cada recomendación indicá: título original, año, director, por qué conecta conmigo (o por qué vale la pena en el bonus), y qué sensación me va a dejar después de verla.
+
+No hagas listas genéricas. Priorizá personalidad, precisión y criterio antes que popularidad.
+
+Devuelve ÚNICAMENTE un arreglo JSON válido con esta estructura exacta, sin texto adicional ni formato markdown:
+[
+    {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué conecta + qué sensación deja.", "bonus": false}},
+    {{"titulo": "Nombre Original", "anio": "YYYY", "justificacion": "Por qué es imprescindible + qué sensación deja.", "bonus": true}}
+]
+El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales (bonus: false) y 1 bonus (bonus: true) al final."""
 
     try:
-        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-        response = client.chat.completions.create(
-            model='gpt-5-nano',
-            messages=[{'role': 'user', 'content': prompt}]
-        )
+        gemini_key = os.getenv('GEMINI_API_KEY')
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+        gemini_body = {"contents": [{"parts": [{"text": prompt}]}]}
+        resp = requests.post(gemini_url, json=gemini_body, timeout=30)
+        resp.raise_for_status()
 
-        texto_limpio = response.choices[0].message.content.strip()
+        texto_limpio = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
         if texto_limpio.startswith("```json"):
             texto_limpio = texto_limpio[7:-3].strip()
         elif texto_limpio.startswith("```"):
@@ -453,6 +469,45 @@ def oracle():
 
     except Exception as e:
         return jsonify({'error': f"Fallo en la conexión neural: {str(e)}"})
+
+@app.route('/dashboard/oracle/prompt')
+def oracle_prompt():
+    if not session.get('user_id'):
+        return jsonify({'error': 'Sesión expirada'})
+    mis_pelis = Movie.query.filter_by(user_id=session['user_id']).all()
+    historial = []
+    for p in mis_pelis:
+        if p.is_watchlist and not p.rating and not p.abandoned:
+            historial.append(f"'{p.title}' (En mi Watchlist - NO RECOMENDAR)")
+        elif p.abandoned:
+            historial.append(f"'{p.title}' (Abandonada - Odio esto)")
+        elif p.rating:
+            historial.append(f"'{p.title}' (Puntaje: {p.rating}/100)")
+        else:
+            historial.append(f"'{p.title}' (Vista)")
+    lineas = "\n".join(historial)
+    prompt = f"""Actuá como un crítico y curador cinéfilo con criterio moderno y personalidad propia.
+Analizá mi historial y detectá patrones reales de gustos (temáticas, tono, narrativa, ritmo, complejidad, impacto emocional y estilo visual).
+
+Películas:
+{lineas}
+
+Tu respuesta tiene DOS partes:
+
+PARTE 1:
+Recomendame exactamente 3 películas que no estén en la lista anterior y que encajen MUY bien con mis gustos.
+Evitá recomendaciones genéricas o excesivamente obvias.
+Priorizá películas que realmente conecten con lo que disfruto y explicá específicamente por qué.
+
+PARTE 2 — BONUS SALVAJE:
+Recomendame UNA sola película fuera de mis gustos habituales, pero que consideres una experiencia cinematográfica imprescindible.
+No busco cine experimental ni películas "de nicho".
+Busco una película que cualquier persona amante del cine debería ver al menos una vez en la vida, aunque no sea de su género habitual.
+
+Para cada recomendación indicá: título original, año, director, por qué conecta conmigo (o por qué vale la pena en el bonus), y qué sensación me va a dejar después de verla.
+
+No hagas listas genéricas. Priorizá personalidad, precisión y criterio antes que popularidad."""
+    return jsonify({'prompt': prompt})
 
 @app.route('/dashboard/oracle/add_watchlist', methods=['POST'])
 def oracle_add_watchlist():

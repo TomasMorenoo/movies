@@ -85,9 +85,18 @@
 
     <!-- Estado inicial -->
     <div id="initial-state">
-      <button id="btn-consultar" class="btn btn-accent btn-lg rounded-pill px-5 py-3 fw-bold shadow-lg">
-        Consultar al Oráculo
-      </button>
+      <div class="d-flex align-items-center justify-content-center gap-2">
+        <button id="btn-consultar" class="btn btn-accent btn-lg rounded-pill px-5 py-3 fw-bold shadow-lg">
+          Consultar al Oráculo
+        </button>
+        <button id="btn-copy-prompt" title="Copiar prompt para tu IA"
+                style="background:transparent; border:1px solid rgba(255,255,255,0.15); border-radius:50%;
+                       width:50px; height:50px; color:var(--text-muted); cursor:pointer;
+                       display:flex; align-items:center; justify-content:center;
+                       transition: border-color 0.2s, color 0.2s; flex-shrink:0;">
+          <span class="material-symbols-outlined" style="font-size:1.3rem;">content_copy</span>
+        </button>
+      </div>
     </div>
 
     <!-- Cargando -->
@@ -295,6 +304,28 @@
             return null;
         }
     }
+
+    // --- Copiar prompt ---
+    document.getElementById('btn-copy-prompt').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-copy-prompt');
+        const icon = btn.querySelector('.material-symbols-outlined');
+        try {
+            const res = await fetch("{{ url_for('oracle_prompt') }}");
+            const data = await res.json();
+            if (data.error) { alert(data.error); return; }
+            await navigator.clipboard.writeText(data.prompt);
+            icon.textContent = 'check';
+            btn.style.borderColor = 'var(--accent)';
+            btn.style.color = 'var(--accent)';
+            setTimeout(() => {
+                icon.textContent = 'content_copy';
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }, 2500);
+        } catch(e) {
+            alert('No se pudo copiar. Intentá desde Chrome o Firefox.');
+        }
+    });
 
     // --- Primera consulta (3 + 1 bonus) ---
     document.getElementById('btn-consultar').addEventListener('click', async () => {
