@@ -315,12 +315,8 @@
             if (data.error) { alert(data.error); return; }
             await navigator.clipboard.writeText(data.prompt);
             icon.textContent = 'check';
-            btn.style.borderColor = 'var(--accent)';
-            btn.style.color = 'var(--accent)';
             setTimeout(() => {
                 icon.textContent = 'content_copy';
-                btn.style.borderColor = '';
-                btn.style.color = '';
             }, 2500);
         } catch(e) {
             alert('No se pudo copiar. Intentá desde Chrome o Firefox.');
