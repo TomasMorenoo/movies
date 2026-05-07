@@ -110,13 +110,7 @@
       <h5 id="results-title" class="fw-bold mb-1" style="color:var(--accent);"></h5>
       <p class="text-muted mb-3" style="font-size:0.85rem;" id="results-subtitle"></p>
 
-      <div id="perfil-box" class="d-none text-start mb-4 p-3 rounded-3"
-           style="background:rgba(0,229,255,0.05); border:1px solid rgba(0,229,255,0.15); font-size:0.88rem; line-height:1.6; color:var(--text-muted);">
-        <span style="color:var(--accent); font-weight:700; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px;">👤 Tu perfil cinéfilo</span>
-        <p id="perfil-texto" class="mb-0 mt-2"></p>
-      </div>
-
-      <div class="oracle-viewport">
+<div class="oracle-viewport">
         <button class="oracle-arrow" id="btn-prev" onclick="changePage(-1)">←</button>
         <div class="oracle-scroll-wrap" id="oracle-scroll">
           <div class="oracle-row text-start" id="cards-container"></div>
@@ -147,6 +141,7 @@
     let allCards = [];
     let currentPage = 0;
     let titulosMostrados = [];
+    let idsMostrados = [];
 
     const frases = [
         "Revisando tu Watchlist para no repetir...",
@@ -323,7 +318,7 @@
             const res = await fetch("{{ url_for('oracle') }}", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cantidad, ya_mostradas: yaMostradas })
+                body: JSON.stringify({ cantidad, ya_mostradas: yaMostradas, ya_mostradas_ids: idsMostrados })
             });
             const data = await res.json();
             clearInterval(interval);
@@ -370,15 +365,11 @@
         }
 
         allCards = data.peliculas;
-        titulosMostrados = allCards.map(p => p.titulo).filter(Boolean);
+        titulosMostrados = allCards.flatMap(p => [p.titulo, p.original_title].filter(Boolean));
+        idsMostrados = allCards.map(p => p.tmdb_id).filter(Boolean);
 
         document.getElementById('results-title').innerText = 'Primera visión del Oráculo';
         document.getElementById('results-subtitle').innerText = '3 recomendaciones para vos + 1 bonus';
-
-        if (data.perfil) {
-            document.getElementById('perfil-texto').innerText = data.perfil;
-            document.getElementById('perfil-box').classList.remove('d-none');
-        }
 
         renderCards();
     });
@@ -396,7 +387,8 @@
         }
 
         allCards = data.peliculas;
-        titulosMostrados.push(...allCards.map(p => p.titulo).filter(Boolean));
+        titulosMostrados.push(...allCards.flatMap(p => [p.titulo, p.original_title].filter(Boolean)));
+        idsMostrados.push(...allCards.map(p => p.tmdb_id).filter(Boolean));
 
         document.getElementById('results-title').innerText = 'Segunda visión del Oráculo';
         document.getElementById('results-subtitle').innerText = '5 recomendaciones nuevas + 1 bonus';

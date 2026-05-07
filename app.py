@@ -380,6 +380,7 @@ def oracle():
 
     cantidad = int(request.json.get('cantidad', 3)) if request.is_json else 3
     ya_mostradas = request.json.get('ya_mostradas', []) if request.is_json else []
+    ya_mostradas_ids = {str(i) for i in request.json.get('ya_mostradas_ids', [])} if request.is_json else set()
 
     historial = []
     for p in mis_pelis:
@@ -404,25 +405,87 @@ def oracle():
 
     prompt = f"""Actua como un critico y curador cinefilo con criterio moderno y personalidad propia.
 
-Mi historial completo:
+IMPORTANTE:
+Responde EXCLUSIVAMENTE en JSON valido.
+NO agregues texto fuera del JSON.
+NO uses markdown.
+NO uses ```json.
+NO expliques el formato.
+NO agregues introducciones ni cierres.
+
+No analices solo generos o popularidad.
+Detecta especificamente:
+- tipo de complejidad narrativa que disfruto,
+- nivel de ambiguedad tolerado,
+- equilibrio entre emocion e intelectualidad,
+- ritmo preferido,
+- tolerancia al simbolismo abstracto,
+- y si prefiero peliculas contemplativas o de tension constante.
+
+NO confundas:
+- complejidad emocional y narrativa accesible
+con
+- surrealismo abstracto o cine excesivamente simbolico.
+
+Dale MUCHISIMO mas peso a:
+- peliculas con puntajes 85+,
+- peliculas abandonadas,
+- peliculas odiadas,
+que a peliculas entre 65 y 75.
+
+No recomiendes peliculas solo porque son consideradas obras maestras o cine importante.
+Prioriza compatibilidad real con mi sensibilidad cinematografica.
+
+Peliculas:
 {reporte_peliculas}{excluir_str}
 
-REGLA FUNDAMENTAL: No recomiendes ninguna pelicula que aparezca en el historial anterior. Los titulos pueden estar en español, ingles u otro idioma, con o sin año entre parentesis, y son la misma pelicula. Si el titulo es parecido Y comparte director o elenco con alguna del historial, tratalos como la misma pelicula y no la recomiendes. Ante cualquier duda, descartala.
+REGLA FUNDAMENTAL:
+No recomiendes ninguna pelicula que aparezca en el historial.
+Los titulos pueden estar en español o ingles, con o sin año.
+Si el titulo es parecido Y comparte director o elenco, tratalos como la misma pelicula.
 
-Tu respuesta tiene DOS secciones dentro de un unico objeto JSON:
-
-1. "perfil": Analiza mis gustos en 4-6 oraciones directas y honestas. Detecta patrones reales entre mis peliculas mas puntuadas: que tipo de experiencia busco, que me engancha, que me deja frio. Hablame directo, con criterio, sin frases genericas.
-
-2. "recomendaciones": Array con exactamente {cantidad + 1} elementos. Los primeros {cantidad} son recomendaciones precisas basadas en el perfil que construiste (bonus:false). El ultimo es el BONUS SALVAJE (bonus:true): una pelicula fuera de mis gustos habituales pero imprescindible, sin cine experimental ni de nicho. En cada "justificacion" escribi 2-3 oraciones especificas y directas, sin frases de relleno.
-
-Devuelve UNICAMENTE este objeto JSON valido, sin texto adicional ni markdown:
+La respuesta DEBE seguir EXACTAMENTE este esquema JSON:
 {{
-  "perfil": "Tu analisis del espectador.",
-  "recomendaciones": [
-    {{"titulo": "Titulo Original", "anio": "YYYY", "justificacion": "Por que la recomendas.", "bonus": false}},
-    {{"titulo": "Titulo Original", "anio": "YYYY", "justificacion": "Por que es imprescindible.", "bonus": true}}
-  ]
-}}"""
+  "analysis": {{
+    "main_tastes": [],
+    "narrative_preferences": [],
+    "emotional_profile": [],
+    "preferred_pacing": "",
+    "ambiguity_tolerance": "",
+    "symbolism_tolerance": "",
+    "complexity_type": "",
+    "what_the_user_avoids": []
+  }},
+  "recommendations": [
+    {{
+      "title": "",
+      "original_title": "",
+      "year": "",
+      "director": "",
+      "why_it_fits": "",
+      "feeling_after_watching": ""
+    }}
+  ],
+  "bonus": {{
+    "title": "",
+    "original_title": "",
+    "year": "",
+    "director": "",
+    "why_it_is_essential": "",
+    "feeling_after_watching": ""
+  }}
+}}
+
+REGLAS IMPORTANTES:
+- recommendations debe tener EXACTAMENTE {cantidad + 3} peliculas.
+- bonus debe tener EXACTAMENTE 1 pelicula.
+- NO repitas peliculas del historial.
+- NO recomiendes peliculas de la watchlist.
+- NO recomiendes peliculas abandonadas.
+- NO uses placeholders.
+- NO dejes campos vacios.
+- Las recomendaciones deben sentirse personalizadas y especificas para el usuario.
+- El bonus debe ser una pelicula enorme, influyente o mundialmente considerada imprescindible, incluso si sale un poco de los gustos habituales del usuario."""
 
     try:
         groq_key = os.getenv('GROQ_API_KEY')
@@ -441,14 +504,36 @@ Devuelve UNICAMENTE este objeto JSON valido, sin texto adicional ni markdown:
             texto_limpio = texto_limpio[3:-3].strip()
 
         parsed = json.loads(texto_limpio)
-        perfil = parsed.get('perfil', '') if isinstance(parsed, dict) else ''
-        recomendaciones = parsed.get('recomendaciones', parsed) if isinstance(parsed, dict) else parsed
+
+        todos = []
+        for rec in parsed.get('recommendations', []):
+            justif = f"Dir. {rec.get('director', '')}. {rec.get('why_it_fits', '')} {rec.get('feeling_after_watching', '')}".strip()
+            todos.append({
+                'titulo': rec.get('original_title') or rec.get('title', ''),
+                'anio': rec.get('year', ''),
+                'justificacion': justif,
+                'bonus': False
+            })
+        bonus_raw = parsed.get('bonus')
+        if bonus_raw:
+            justif = f"Dir. {bonus_raw.get('director', '')}. {bonus_raw.get('why_it_is_essential', '')} {bonus_raw.get('feeling_after_watching', '')}".strip()
+            todos.append({
+                'titulo': bonus_raw.get('original_title') or bonus_raw.get('title', ''),
+                'anio': bonus_raw.get('year', ''),
+                'justificacion': justif,
+                'bonus': True
+            })
+
+        # IDs y blacklist existentes para filtrar server-side
+        existing_tmdb_ids = {str(p.tmdb_id) for p in mis_pelis if p.tmdb_id}
+        blacklist_ids = {str(b.tmdb_id) for b in OracleBlacklist.query.filter_by(user_id=session['user_id']).all() if b.tmdb_id}
+        excluir_ids = existing_tmdb_ids | blacklist_ids | ya_mostradas_ids
 
         # ENRIQUECER CON TMDB
         tmdb_api_key = os.getenv('TMDB_API_KEY')
         resultados_finales = []
 
-        for rec in recomendaciones:
+        for rec in todos:
             search_url = f"https://api.themoviedb.org/3/search/movie?api_key={tmdb_api_key}&query={rec['titulo']}&year={rec['anio']}&language=es-ES"
             tmdb_res = requests.get(search_url).json()
 
@@ -461,19 +546,27 @@ Devuelve UNICAMENTE este objeto JSON valido, sin texto adicional ni markdown:
                 imdb_score = None
                 if details and details.get('imdb_id'):
                     imdb_score = get_imdb_rating(details['imdb_id'])
-                resultados_finales.append({
-                    'titulo': peli.get('title'),
-                    'poster': f"https://image.tmdb.org/t/p/w500{peli['poster_path']}" if peli.get('poster_path') else poster_fallback,
-                    'sinopsis': peli.get('overview', 'Sin descripción disponible.'),
-                    'fecha': peli.get('release_date', '').split('-')[0] if peli.get('release_date') else rec['anio'],
-                    'justificacion': rec['justificacion'],
-                    'tmdb_id': peli['id'],
-                    'imdb_score': imdb_score,
-                    'bonus': es_bonus
-                })
+                orig_lang = peli.get('original_language', '')
+                if orig_lang in ('en', 'es'):
+                    display_title = peli.get('original_title') or peli.get('title')
+                else:
+                    display_title = peli.get('title')
+                if str(peli['id']) not in excluir_ids:
+                    resultados_finales.append({
+                        'titulo': display_title,
+                        'original_title': rec['titulo'],
+                        'poster': f"https://image.tmdb.org/t/p/w500{peli['poster_path']}" if peli.get('poster_path') else poster_fallback,
+                        'sinopsis': peli.get('overview', 'Sin descripción disponible.'),
+                        'fecha': peli.get('release_date', '').split('-')[0] if peli.get('release_date') else rec['anio'],
+                        'justificacion': rec['justificacion'],
+                        'tmdb_id': peli['id'],
+                        'imdb_score': imdb_score,
+                        'bonus': es_bonus
+                    })
             else:
                 resultados_finales.append({
                     'titulo': rec['titulo'],
+                    'original_title': rec['titulo'],
                     'poster': poster_fallback,
                     'sinopsis': 'Detalles no encontrados en TMDB.',
                     'fecha': rec['anio'],
@@ -483,7 +576,10 @@ Devuelve UNICAMENTE este objeto JSON valido, sin texto adicional ni markdown:
                     'bonus': es_bonus
                 })
 
-        return jsonify({'success': True, 'peliculas': resultados_finales, 'perfil': perfil})
+        # Separar regulares y bonus, limitar regulares a cantidad solicitada
+        regulares = [r for r in resultados_finales if not r['bonus']][:cantidad]
+        bonus = [r for r in resultados_finales if r['bonus']][:1]
+        return jsonify({'success': True, 'peliculas': regulares + bonus})
 
     except Exception as e:
         return jsonify({'error': f"Fallo en la conexión neural: {str(e)}"})
@@ -505,26 +601,88 @@ def oracle_prompt():
             historial.append(f"'{p.title}' (Vista)")
     lineas = "\n".join(historial)
     prompt = f"""Actua como un critico y curador cinefilo con criterio moderno y personalidad propia.
-Analiza mi historial y detecta patrones reales de gustos (tematicas, tono, narrativa, ritmo, complejidad, impacto emocional y estilo visual).
+
+No analices solo generos o popularidad.
+Detecta especificamente:
+- tipo de complejidad narrativa que disfruto,
+- nivel de ambiguedad tolerado,
+- equilibrio entre emocion e intelectualidad,
+- ritmo preferido,
+- tolerancia al simbolismo abstracto,
+- y si prefiero peliculas contemplativas o de tension constante.
+
+NO confundas:
+- complejidad emocional y narrativa accesible
+con
+- surrealismo abstracto o cine excesivamente simbolico.
+
+Dale MUCHISIMO mas peso a:
+- peliculas con puntajes 85+,
+- peliculas abandonadas,
+- peliculas odiadas,
+que a peliculas entre 65 y 75.
+
+No recomiendes peliculas solo porque son consideradas obras maestras o cine importante.
+Prioriza compatibilidad real con mi sensibilidad cinematografica.
 
 Peliculas:
 {lineas}
 
-REGLA FUNDAMENTAL: No recomiendes ninguna pelicula que aparezca en el historial. Los titulos pueden estar en español o ingles, con o sin año. Si el titulo es parecido Y comparte director o elenco, tratalos como la misma pelicula.
+REGLA FUNDAMENTAL:
+No recomiendes ninguna pelicula que aparezca en el historial.
+Los titulos pueden estar en español o ingles, con o sin año.
+Si el titulo es parecido Y comparte director o elenco, tratalos como la misma pelicula.
 
 Tu respuesta tiene DOS partes:
 
 PARTE 1:
-Recomendame exactamente 3 peliculas que no esten en la lista anterior y que encajen MUY bien con mis gustos.
-Evita recomendaciones genericas. Explica especificamente por que cada una conecta conmigo.
+Recomendame exactamente 3 peliculas que NO esten en la lista anterior y que encajen MUY bien con mis gustos.
+
+Evita recomendaciones genericas.
+Explica especificamente por que cada una conecta conmigo.
+
+Prioriza:
+- compatibilidad emocional,
+- tono,
+- tension,
+- tipo de narrativa,
+- atmosfera,
+- y sensibilidad cinematografica.
+
+NO priorices solamente:
+- genero,
+- popularidad,
+- puntuacion critica,
+- ni peliculas "complejas" porque si.
+
+Para cada recomendacion indica:
+- titulo original,
+- año,
+- director,
+- por que la recomendas especificamente para mi,
+- y que sensacion deja despues de verla.
 
 PARTE 2 - BONUS SALVAJE:
-Recomendame UNA sola pelicula fuera de mis gustos habituales pero imprescindible para cualquier amante del cine.
-No cine experimental ni de nicho.
 
-Para cada recomendacion indica: titulo original, año, director, por que la recomendas y que sensacion deja despues de verla.
+Recomendame UNA sola pelicula fuera de mis gustos habituales, pero que sea considerada una experiencia cinematografica imprescindible y ampliamente reconocida.
 
-No hagas listas genericas. Prioriza personalidad, precision y criterio antes que popularidad."""
+NO quiero:
+- cine experimental,
+- peliculas de nicho,
+- cine extremadamente artistico,
+- ni recomendaciones "para entendidos".
+
+Quiero una pelicula enorme, influyente o mundialmente considerada un peliculon.
+
+Para la recomendacion bonus indica:
+- titulo original,
+- año,
+- director,
+- por que es considerada imprescindible,
+- y que sensacion deja despues de verla.
+
+No hagas listas genericas.
+Prioriza personalidad, precision y criterio antes que popularidad."""
     return jsonify({'prompt': prompt})
 
 @app.route('/dashboard/oracle/discard', methods=['POST'])
