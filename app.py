@@ -419,9 +419,14 @@ El arreglo debe tener exactamente {cantidad + 1} elementos: {cantidad} normales 
 
     try:
         gemini_key = os.getenv('GEMINI_API_KEY')
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
         gemini_body = {"contents": [{"parts": [{"text": prompt}]}]}
-        resp = requests.post(gemini_url, json=gemini_body, timeout=30)
+        models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash']
+        resp = None
+        for model in models:
+            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
+            resp = requests.post(gemini_url, json=gemini_body, timeout=30)
+            if resp.status_code != 429:
+                break
         resp.raise_for_status()
 
         texto_limpio = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
