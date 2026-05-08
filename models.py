@@ -42,6 +42,7 @@ class Movie(db.Model):
     # NUEVO: Puntaje de IMDb
     imdb_score = db.Column(db.String(10), nullable=True)
     runtime = db.Column(db.Integer, nullable=True)
+    keywords = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
         return f'<Movie {self.title}>'

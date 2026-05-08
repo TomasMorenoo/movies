@@ -295,13 +295,13 @@
     <!-- Géneros más vistos -->
     <div class="col-12 col-md-7">
         <div class="stat-card p-3 p-md-4 h-100 shadow-sm d-flex flex-column">
-            <p class="section-title">🎭 Géneros más vistos <small class="text-muted" style="font-size:0.6rem; text-transform:none; letter-spacing:0;">(género principal)</small></p>
+            <p class="section-title">🎭 Tipo de películas que ves</p>
             {% if stats.top_generos %}
             {% set max_g = stats.top_generos[0][1] %}
             <div class="hbar-wrap">
             {% for genero, cant in stats.top_generos %}
             <div class="hbar-row">
-                <span class="hbar-label">{{ genero }}</span>
+                <span class="hbar-label" style="width:140px; min-width:140px; font-size:0.7rem;" title="{{ genero }}">{{ genero }}</span>
                 <div class="hbar-track">
                     <div class="hbar-fill" style="width:{{ (cant/max_g*100)|int }}%; background:var(--accent); color:#000;">{{ cant }}</div>
                 </div>

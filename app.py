@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, Response, jsonify
 from models import db, Movie, User, OracleBlacklist
-from tmdb_helper import search_movie, get_movie_details, get_imdb_rating
+from tmdb_helper import search_movie, get_movie_details, get_imdb_rating, get_movie_keywords
 import os
 import csv
 from io import StringIO
@@ -205,14 +205,15 @@ def stats():
             plataformas[p.platform] += 1
     top_plataformas = sorted(plataformas.items(), key=lambda x: x[1], reverse=True)[:6]
 
-    # Top géneros — solo el género PRINCIPAL (primer elemento) de cada película
-    generos_count = defaultdict(int)
+    # Top combos de géneros — un combo por película (primeros 2 géneros)
+    combos_count = defaultdict(int)
     for p in vistas:
-        if p.genres:
-            primer_genero = p.genres.split(',')[0].strip()
-            if primer_genero:
-                generos_count[primer_genero] += 1
-    top_generos = sorted(generos_count.items(), key=lambda x: x[1], reverse=True)[:5]
+        if not p.genres:
+            continue
+        gs = [g.strip() for g in p.genres.split(',') if g.strip()]
+        combo = " / ".join(sorted(gs[:2])) if len(gs) >= 2 else gs[0]
+        combos_count[combo] += 1
+    top_generos = sorted(combos_count.items(), key=lambda x: x[1], reverse=True)[:6]
 
     # Top directores
     directores_count = defaultdict(int)
@@ -233,6 +234,51 @@ def stats():
 
     total_minutos = sum(p.runtime for p in vistas if p.runtime)
 
+    # Perfil cinéfilo — solo keywords de tono/estilo/atmósfera
+    KW_UTILES = {
+        # Géneros y subgéneros
+        'psychological thriller', 'psychological horror', 'psychological drama',
+        'crime thriller', 'crime horror', 'conspiracy thriller', 'suspense mystery',
+        'neo-noir', 'dark fairy tale', 'magic realism', 'urban gothic', 'steampunk',
+        'supernatural thriller', 'supernatural horror', 'spy thriller', 'space adventure',
+        # Recursos narrativos
+        'twist', 'time-manipulation', 'time travel', 'time paradox', 'non-linear narrative',
+        'high concept', 'allegory', 'symbolism', 'ambiguity', 'surrealism',
+        'parallel universe', 'whodunit', 'story within the story',
+        # Temas y atmósfera
+        'obsession', 'manipulation', 'revenge', 'guilt', 'redemption', 'suppressed past',
+        'identity', 'melancholy', 'dystopia', 'investigation', 'vigilante',
+        'rivalry', 'betrayal', 'deception', 'cowardice', 'ambivalent',
+        # Figuras
+        'serial killer', 'detective', 'psychopath', 'cannibal', 'spy',
+        'heist', 'dream world', 'subconscious', 'memory', 'intellectual',
+        # Ciencia ficción temática
+        'wormhole', 'black hole', 'quantum mechanics', 'artificial intelligence (a.i.)',
+        'space travel', 'alien contact', 'first contact', 'extraterrestrial technology',
+        'determinism', 'communication',
+        # Tono emocional útil
+        'psychological profiling', 'cat and mouse', 'mind-blowing', 'bittersweet',
+        'moral manipulation', 'ideological clash', 'psychological predator',
+    }
+
+    kw_alto = defaultdict(int)
+    kw_bajo = defaultdict(int)
+
+    for p in calificadas:
+        if not p.keywords:
+            continue
+        kws = [k.strip() for k in p.keywords.split(',') if k.strip().lower() in KW_UTILES]
+        bucket = kw_alto if p.rating >= 75 else kw_bajo
+        for kw in kws:
+            bucket[kw] += 1
+
+    top_perfil = sorted(kw_alto.items(), key=lambda x: -x[1])[:18]
+
+    kw_evita = sorted(
+        [(kw, cnt) for kw, cnt in kw_bajo.items() if kw not in kw_alto],
+        key=lambda x: -x[1]
+    )[:8]
+
     stats_data = {
         'total_vistas': len(vistas),
         'total_minutos': total_minutos,
@@ -250,6 +296,8 @@ def stats():
         'peor': peor,
         'primera': primera,
         'ultima': ultima,
+        'perfil_keywords': top_perfil,
+        'perfil_evita': kw_evita,
     }
 
     return render_template('stats.html', stats=stats_data)
@@ -312,12 +360,16 @@ def save_movie():
                 imdb_score = get_imdb_rating(imdb_id)
             runtime = details.get('runtime') or None
 
+            kw_list = get_movie_keywords(tmdb_id)
+            keywords_str = ", ".join(kw_list) if kw_list else None
+
         nueva_peli = Movie(
             user_id=session['user_id'],
             tmdb_id=tmdb_id, title=title, poster_path=poster_path,
             rating=rating, platform=platform, opinion=opinion, date_watched=date_watched,
             director=director, genres=generos, cast=actores, imdb_score=imdb_score,
-            is_watchlist=is_watchlist, abandoned=abandoned, runtime=runtime
+            is_watchlist=is_watchlist, abandoned=abandoned, runtime=runtime,
+            keywords=keywords_str
         )
         db.session.add(nueva_peli)
         db.session.commit()
@@ -735,6 +787,9 @@ def oracle_add_watchlist():
             if imdb_id:
                 imdb_score = get_imdb_rating(imdb_id)
 
+        kw_list = get_movie_keywords(tmdb_id)
+        keywords_str = ", ".join(kw_list) if kw_list else None
+
         # 3. La guardamos en la Watchlist con TODOS los datos
         nueva_peli = Movie(
             user_id=session['user_id'],
@@ -745,6 +800,7 @@ def oracle_add_watchlist():
             cast=actores,
             genres=generos,
             imdb_score=imdb_score,
+            keywords=keywords_str,
             is_watchlist=True,
             abandoned=False
         )

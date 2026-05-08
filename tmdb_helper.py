@@ -31,6 +31,17 @@ def get_movie_details(tmdb_id):
         return response.json()
     return None
 
+def get_movie_keywords(tmdb_id):
+    url = f"{BASE_URL}/movie/{tmdb_id}/keywords"
+    params = {'api_key': TMDB_API_KEY}
+    try:
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            return [k['name'] for k in response.json().get('keywords', [])]
+    except:
+        pass
+    return []
+
 def get_imdb_rating(imdb_id):
     """Va a OMDb API a buscar el puntaje usando el tt1234567 de IMDb"""
     if not imdb_id or not OMDB_API_KEY:
