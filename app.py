@@ -223,7 +223,7 @@ def stats():
     primera = con_fecha_sorted[0] if con_fecha_sorted else None
     ultima = con_fecha_sorted[-1] if con_fecha_sorted else None
 
-    total_minutos = sum(p.runtime for p in vistas if p.runtime)
+    total_minutos = sum(p.runtime for p in calificadas if p.runtime)
 
     top_perfil, kw_evita = oracle_helper.build_taste_profile(calificadas)
 
