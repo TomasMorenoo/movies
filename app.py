@@ -148,7 +148,8 @@ def index():
             plataformas[p.platform] = plataformas.get(p.platform, 0) + 1
     plataforma_fav = max(plataformas, key=plataformas.get) if plataformas else "N/A"
 
-    stats = {'total': len(vistas), 'promedio': promedio, 'plataforma': plataforma_fav}
+    efectivas = [p for p in vistas if p.rating is not None and not p.abandoned]
+    stats = {'total': len(efectivas), 'promedio': promedio, 'plataforma': plataforma_fav}
 
     return render_template('index.html', peliculas=vistas, pendientes=pendientes, stats=stats)
 
