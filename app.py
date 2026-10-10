@@ -188,20 +188,20 @@ def stats():
 
     from collections import defaultdict
     por_mes = defaultdict(int)
-    for p in vistas:
+    for p in calificadas:
         if p.date_watched and len(p.date_watched) >= 7:
             mes_key = p.date_watched[:7]
             por_mes[mes_key] += 1
     meses_sorted = sorted(por_mes.items())
 
     plataformas = defaultdict(int)
-    for p in vistas:
+    for p in calificadas:
         if p.platform:
             plataformas[p.platform] += 1
     top_plataformas = sorted(plataformas.items(), key=lambda x: x[1], reverse=True)[:6]
 
     combos_count = defaultdict(int)
-    for p in vistas:
+    for p in calificadas:
         if not p.genres:
             continue
         gs = [g.strip() for g in p.genres.split(',') if g.strip()]
@@ -218,7 +218,7 @@ def stats():
     mejor = max(calificadas, key=lambda x: x.rating) if calificadas else None
     peor = min(calificadas, key=lambda x: x.rating) if calificadas else None
 
-    con_fecha = [p for p in vistas if p.date_watched]
+    con_fecha = [p for p in calificadas if p.date_watched]
     con_fecha_sorted = sorted(con_fecha, key=lambda x: x.date_watched)
     primera = con_fecha_sorted[0] if con_fecha_sorted else None
     ultima = con_fecha_sorted[-1] if con_fecha_sorted else None
