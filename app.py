@@ -136,8 +136,8 @@ def index():
     vistas = [p for p in todas_las_pelis if not p.is_watchlist]
     pendientes = [p for p in todas_las_pelis if p.is_watchlist]
 
-    vistas.sort(key=lambda x: (x.date_watched or '0000-00-00', x.created_at or datetime.min), reverse=True)
-    pendientes.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
+    vistas.sort(key=lambda x: (x.date_watched or '0000-00-00', x.created_at or datetime.min, x.id), reverse=True)
+    pendientes.sort(key=lambda x: (x.created_at or datetime.min, x.id), reverse=True)
 
     ratings = [p.rating for p in vistas if p.rating is not None and not p.abandoned]
     promedio = round(sum(ratings) / len(ratings)) if ratings else 0
