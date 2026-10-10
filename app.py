@@ -224,12 +224,15 @@ def stats():
     ultima = con_fecha_sorted[-1] if con_fecha_sorted else None
 
     total_minutos = sum(p.runtime for p in calificadas if p.runtime)
+    con_runtime = [p for p in calificadas if p.runtime]
+    promedio_runtime = round(total_minutos / len(con_runtime)) if con_runtime else 0
 
     top_perfil, kw_evita = oracle_helper.build_taste_profile(calificadas)
 
     stats_data = {
         'total_vistas': len(calificadas),
         'total_minutos': total_minutos,
+        'promedio_runtime': promedio_runtime,
         'total_calificadas': len(calificadas),
         'total_abandonadas': len(abandonadas),
         'total_pendientes': len(pendientes),

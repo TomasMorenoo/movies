@@ -83,6 +83,7 @@
     {% set kpis = [
         (stats.total_vistas,      'Vistas',        'var(--accent)'),
         (stats.promedio ~ '/100', 'Promedio',       'var(--accent)'),
+        (stats.promedio_runtime ~ ' min', 'Duración Prom', '#00E676'),
         (stats.rangos['90-99'] + stats.rangos['100'], 'Obras Maestras', '#9D00FF'),
         (stats.total_abandonadas, 'Abandonadas',   '#FF1744'),
         (stats.total_pendientes,  'Watchlist',      '#FF9100'),
