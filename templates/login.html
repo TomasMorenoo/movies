@@ -28,8 +28,9 @@
         {% endif %}
 
         <form method="POST" action="{{ url_for('register' if mode == 'register' else 'login') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" name="username" placeholder="Usuario" required autocomplete="off">
-            <input type="password" name="password" placeholder="Contraseña" required>
+            <input type="password" name="password" maxlength="256" {% if mode == 'register' %}minlength="12"{% endif %} placeholder="Contraseña" required>
             
             <button type="submit">
                 {{ 'Crear cuenta' if mode == 'register' else 'Entrar' }}

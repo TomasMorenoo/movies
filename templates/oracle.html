@@ -157,7 +157,7 @@
         try {
             const res = await fetch("{{ url_for('oracle_discard') }}", {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': {{ csrf_token() | tojson }} },
                 body: JSON.stringify({ tmdb_id: tmdbId, titulo })
             });
             const data = await res.json();
@@ -177,7 +177,7 @@
         try {
             const res = await fetch("{{ url_for('oracle_add_watchlist') }}", {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': {{ csrf_token() | tojson }} },
                 body: JSON.stringify({ tmdb_id: tmdbId, titulo, poster })
             });
             const data = await res.json();
@@ -196,8 +196,19 @@
         }
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    document.getElementById('cards-container').addEventListener('click', event => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const d = button.dataset;
+        if (d.action === 'save') guardarEnWatchlist(d.id, d.title, d.poster, button);
+        else descartarPeli(d.id, d.title, button);
+    });
     function buildCardHtml(peli) {
-        const tituloSafe = (peli.titulo || '').replace(/'/g, "\\'");
+        peli = Object.fromEntries(Object.entries(peli).map(([key, value]) => [key, typeof value === 'string' ? escapeHtml(value) : value]));
+        const tituloSafe = peli.titulo || '';
         const esBonus = peli.bonus === true;
         const bonusBadge  = esBonus ? `<div class="bonus-badge">🎲 bonus</div>` : '';
         const cardClass   = esBonus ? 'bonus-card' : '';
@@ -215,11 +226,11 @@
               <h4 class="fw-bold text-center" style="color:${hoverColor};">${peli.titulo} (${peli.fecha})</h4>
               <p class="small mb-3 text-center" style="font-size:0.9rem;overflow-y:auto;max-height:160px;">${peli.sinopsis}</p>
               <button class="${btnColor} btn rounded-pill fw-bold shadow-lg px-4 mb-2"
-                      onclick="guardarEnWatchlist('${peli.tmdb_id}','${tituloSafe}','${peli.poster}',this)">
+                      data-action="save" data-id="${peli.tmdb_id}" data-title="${tituloSafe}" data-poster="${peli.poster}">
                 ➕ Agregar a Watchlist
               </button>
               <button class="btn btn-outline-secondary rounded-pill px-3" style="font-size:0.75rem;"
-                      onclick="descartarPeli('${peli.tmdb_id}','${tituloSafe}',this)">
+                      data-action="discard" data-id="${peli.tmdb_id}" data-title="${tituloSafe}">
                 👎 No me interesa
               </button>
             </div>
@@ -317,7 +328,7 @@
         try {
             const res = await fetch("{{ url_for('oracle') }}", {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': {{ csrf_token() | tojson }} },
                 body: JSON.stringify({ cantidad, ya_mostradas: yaMostradas, ya_mostradas_ids: idsMostrados })
             });
             const data = await res.json();
@@ -359,7 +370,7 @@
 
         if (!data || data.error) {
             document.getElementById('cards-container').innerHTML =
-                `<div class="alert alert-danger w-100 text-center">${data?.error || 'Error de conexión'}</div>`;
+                `<div class="alert alert-danger w-100 text-center">${escapeHtml(data?.error || 'Error de conexión')}</div>`;
             document.getElementById('btn-more-wrap').classList.add('d-none');
             return;
         }
@@ -381,7 +392,7 @@
 
         if (!data || data.error) {
             document.getElementById('cards-container').innerHTML =
-                `<div class="alert alert-danger w-100 text-center">${data?.error || 'Error de conexión'}</div>`;
+                `<div class="alert alert-danger w-100 text-center">${escapeHtml(data?.error || 'Error de conexión')}</div>`;
             document.getElementById('btn-restart-only').classList.remove('d-none');
             return;
         }

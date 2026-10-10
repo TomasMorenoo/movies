@@ -4,4 +4,6 @@ requests
 python-dotenv
 Werkzeug
 psycopg2-binary
-jsonify
+Flask-WTF>=1.2,<2
+Flask-Limiter>=3.8,<5
+gunicorn>=23,<24

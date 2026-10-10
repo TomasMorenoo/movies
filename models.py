@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -43,6 +44,7 @@ class Movie(db.Model):
     imdb_score = db.Column(db.String(10), nullable=True)
     runtime = db.Column(db.Integer, nullable=True)
     keywords = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
 
     def __repr__(self):
         return f'<Movie {self.title}>'

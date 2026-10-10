@@ -4,8 +4,6 @@ services:
   db:
     image: postgres:15-alpine
     container_name: mobatai_db
-    ports:
-      - "5432:5432"
     environment:
       # Docker lee estos valores directamente de tu archivo .env
       POSTGRES_USER: ${POSTGRES_USER}
@@ -14,6 +12,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   movie_app:
     build: .
@@ -26,7 +30,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

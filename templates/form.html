@@ -20,6 +20,7 @@
     <div class="col-lg-10">
         <h3 class="mb-4 fw-bold">Nueva Entrada</h3>
         <form method="POST" action="{{ url_for('form') }}" class="mb-4">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="input-group input-group-lg shadow-sm">
                 <input type="text" name="query" class="form-control fs-6" placeholder="Buscar título en TMDB..." required autofocus>
                 <button class="btn btn-accent px-3 fs-6" type="submit">Buscar</button>
@@ -30,7 +31,7 @@
         <h6 class="text-muted mb-2 small fw-bold text-uppercase tracking-wide">Resultados</h6>
         <div class="d-flex flex-nowrap overflow-auto scroll-horizontal pb-3 gap-3 mb-4" id="resultsContainer">
             {% for res in resultados %}
-            <div class="card movie-select-card text-light flex-shrink-0" style="width: 130px;" onclick="selectMovie('{{ res.id }}', '{{ res.title | replace("'", "\\'") }}', '{{ res.poster_path or '' }}', this)">
+            <div class="card movie-select-card text-light flex-shrink-0" style="width: 130px;" data-id="{{ res.id }}" data-title="{{ res.title }}" data-poster="{{ res.poster_path or '' }}" onclick="selectMovie(this.dataset.id, this.dataset.title, this.dataset.poster, this)">
                 {% if res.poster_path %}
                 <img src="https://image.tmdb.org/t/p/w200{{ res.poster_path }}" class="card-img-top rounded-top" style="height: 190px; object-fit: cover;">
                 {% else %}
@@ -49,6 +50,7 @@
             </div>
 
             <form action="{{ url_for('save_movie') }}" method="POST" id="mainForm">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="tmdb_id" id="hidden_tmdb_id" required>
                 <input type="hidden" name="title" id="hidden_title">
                 <input type="hidden" name="poster_path" id="hidden_poster_path">

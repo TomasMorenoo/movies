@@ -14,7 +14,7 @@ def search_movie(query):
         'query': query,
         'language': 'es-ES'
     }
-    response = requests.get(url, params=params)
+    response = requests.get(url, params=params, timeout=10)
     if response.status_code == 200:
         return response.json().get('results', [])
     return []
@@ -26,7 +26,7 @@ def get_movie_details(tmdb_id):
         'language': 'es-ES',
         'append_to_response': 'credits'
     }
-    response = requests.get(url, params=params)
+    response = requests.get(url, params=params, timeout=10)
     if response.status_code == 200:
         return response.json()
     return None
@@ -35,7 +35,7 @@ def get_movie_keywords(tmdb_id):
     url = f"{BASE_URL}/movie/{tmdb_id}/keywords"
     params = {'api_key': TMDB_API_KEY}
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=10)
         if response.status_code == 200:
             return [k['name'] for k in response.json().get('keywords', [])]
     except:
@@ -46,9 +46,9 @@ def get_imdb_rating(imdb_id):
     """Va a OMDb API a buscar el puntaje usando el tt1234567 de IMDb"""
     if not imdb_id or not OMDB_API_KEY:
         return None
-    url = f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}&i={imdb_id}"
+    url = f"https://www.omdbapi.com/?apikey={OMDB_API_KEY}&i={imdb_id}"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
             rating = data.get('imdbRating')

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎬 Mobatai Vault</title>
-    
+
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#00E5FF">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3658/3658959.png">
@@ -12,21 +12,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+
     <style>
         :root {
-            --bg-main: #121212;      
-            --bg-card: #1E1E1E;      
-            --accent: #00E5FF;       
-            --text-main: #FFFFFF;    
-            --text-muted: #A0A0A0;   
+            --bg-main: #121212;
+            --bg-card: #1E1E1E;
+            --accent: #00E5FF;
+            --text-main: #FFFFFF;
+            --text-muted: #A0A0A0;
         }
         body { background-color: var(--bg-main); color: var(--text-main); font-family: 'Poppins', sans-serif; -webkit-font-smoothing: antialiased; }
-        
+
         .navbar-custom { background-color: rgba(18, 18, 18, 0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 1rem 0; }
         .navbar-brand { font-weight: 700; letter-spacing: 1.5px; font-size: 1.5rem; color: var(--text-main) !important; }
         .navbar-brand span { color: var(--accent); }
-        
+
         .btn-custom-outline { border: 1px solid rgba(255, 255, 255, 0.2); color: var(--text-main); transition: all 0.3s ease; font-weight: 600; }
         .btn-custom-outline:hover { border-color: var(--accent); background: rgba(0, 229, 255, 0.1); color: var(--accent); }
         .btn-accent { background-color: var(--accent); color: #000; border: none; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.2); }
@@ -36,7 +36,7 @@
         .card, .form-section-card { background-color: var(--bg-card) !important; border: 1px solid rgba(255, 255, 255, 0.05) !important; }
         .text-muted { color: var(--text-muted) !important; }
         .text-warning { color: var(--accent) !important; }
-        
+
         /* Avatar menú */
         .hide-toggle::after { display: none !important; }
         .dropdown-menu-custom { background-color: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.1); }
@@ -106,12 +106,12 @@
     <nav class="navbar-custom sticky-top mb-5">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
-                
+
                 <a class="navbar-brand m-0" href="{{ url_for('index') }}">Mobatai<span>Vault</span></a>
-                
+
                 {% if session.get('username') %}
                 <div class="d-flex gap-2 align-items-center">
-                    
+
                     <!-- Desktop: links visibles en md+ -->
                     <a class="btn btn-outline-info btn-sm px-3 rounded-pill fw-bold shadow-sm d-none d-md-inline-block" href="{{ url_for('oracle') }}">👁️ Oráculo</a>
                     <a class="btn btn-custom-outline btn-sm px-3 rounded-pill shadow-sm d-none d-md-inline-block" href="{{ url_for('stats') }}">📊 Stats</a>
@@ -133,7 +133,7 @@
                             </li>
                             <li><a class="dropdown-item py-2" href="{{ url_for('export_csv') }}">📥 Exportar a CSV</a></li>
                             <li><hr class="dropdown-divider border-secondary"></li>
-                            <li><a class="dropdown-item text-danger py-2 fw-bold" href="{{ url_for('logout') }}">🚪 Salir</a></li>
+                            <li><form method="POST" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="dropdown-item text-danger py-2 fw-bold" >🚪 Salir</button></form></li>
                         </ul>
                     </div>
 
@@ -156,16 +156,16 @@
                 <a class="mobile-link" href="{{ url_for('top10') }}">🏆 Top 10</a>
                 <a class="mobile-link" href="{{ url_for('form') }}">✏️ Nueva entrada</a>
                 <a class="mobile-link" href="{{ url_for('export_csv') }}">📥 Exportar a CSV</a>
-                <a class="mobile-link danger" href="{{ url_for('logout') }}">🚪 Salir</a>
+                <form method="POST" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="mobile-link danger" >🚪 Salir</button></form>
             </div>
             {% endif %}
         </div>
     </nav>
-    
+
     <div class="container pb-5">
         {% block content %}{% endblock %}
     </div>
-    
+
     {% if session.get('username') %}
     <a href="{{ url_for('form') }}" class="fab-add d-md-none" aria-label="Nueva película">+</a>
     {% endif %}
