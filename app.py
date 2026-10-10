@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, Response, jsonify
-from models import db, Movie, User, OracleBlacklist
+from models import db, Movie, User, OracleBlacklist, OracleShown
 from tmdb_helper import search_movie, get_movie_details, get_imdb_rating, get_movie_keywords
+import oracle_helper
 import os
 import csv
 from io import StringIO
@@ -17,13 +18,11 @@ if len(app.secret_key) < 32 or app.secret_key == 'fallback_dev_key_cambiar_en_pr
     raise RuntimeError('SECRET_KEY debe tener al menos 32 caracteres aleatorios')
 from security import configure_security
 configure_security(app)
-# Lee la URL de la base de datos desde tu archivo .env (PostgreSQL)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 
-# Crea las tablas (User y Movie) automáticamente si no existen
 with app.app_context():
     try:
         db.create_all()
@@ -47,17 +46,14 @@ def login():
 
     error = None
     if request.method == 'POST':
-        # 1. Agarramos lo que escribió (solo le sacamos los espacios, dejamos las mayúsculas)
         username_input = request.form.get('username', '').strip()
         password = request.form.get('password')
 
-        # 2. Magia pura: Convertimos temporalmente la base y el texto a minúsculas solo para comparar
         user = User.query.filter(db.func.lower(User.username) == username_input.lower()).first()
 
         if user and user.check_password(password):
             session.clear()
             session['user_id'] = user.id
-            # 3. Guardamos en la sesión el nombre original tal cual está en la base de datos
             session['username'] = user.username
             session.permanent = True
             return redirect(url_for('index'))
@@ -73,17 +69,14 @@ def register():
 
     error = None
     if request.method == 'POST':
-        # Agarramos el texto original
         username_input = request.form.get('username', '').strip()
         password = request.form.get('password')
 
-        # Verificamos si existe alguien con ese nombre (ignorando mayúsculas)
         existe = User.query.filter(db.func.lower(User.username) == username_input.lower()).first()
 
         if existe:
             error = "El usuario ya existe. Elegí otro."
         else:
-            # Guardamos el usuario con el formato EXACTO que escribió
             nuevo_usuario = User(username=username_input)
             nuevo_usuario.set_password(password)
             db.session.add(nuevo_usuario)
@@ -107,7 +100,6 @@ def export_csv():
     if not session.get('user_id'):
         return redirect(url_for('login'))
 
-    # Solo exporta las películas del usuario logueado
     peliculas = Movie.query.filter_by(user_id=session['user_id']).all()
 
     def generate():
@@ -130,7 +122,6 @@ def export_csv():
             data.seek(0)
             data.truncate(0)
 
-    # El archivo ahora tiene el nombre del usuario para no mezclar backups
     filename = f"mobatai_vault_{session['user_id']}_backup.csv"
     return Response(generate(), mimetype='text/csv', headers={"Content-Disposition": f"attachment; filename={filename}"})
 
@@ -140,7 +131,6 @@ def index():
     if not session.get('user_id'):
         return redirect(url_for('login'))
 
-    # Trae SOLO las películas del dueño de la cuenta
     todas_las_pelis = Movie.query.filter_by(user_id=session['user_id']).all()
 
     vistas = [p for p in todas_las_pelis if not p.is_watchlist]
@@ -183,10 +173,8 @@ def stats():
     volver_a_ver = [p for p in vistas if p.rating is None]
     calificadas = [p for p in vistas if p.rating is not None]
 
-    # Promedio general
     promedio = round(sum(p.rating for p in calificadas) / len(calificadas)) if calificadas else 0
 
-    # Distribución de puntuaciones
     rangos = {'0-34': 0, '35-54': 0, '55-74': 0, '75-89': 0, '90-99': 0, '100': 0}
     for p in calificadas:
         r = p.rating
@@ -197,23 +185,20 @@ def stats():
         elif r >= 35: rangos['35-54'] += 1
         else: rangos['0-34'] += 1
 
-    # Películas por mes — todos los meses con actividad, ordenados cronológicamente
     from collections import defaultdict
     por_mes = defaultdict(int)
     for p in vistas:
         if p.date_watched and len(p.date_watched) >= 7:
-            mes_key = p.date_watched[:7]  # "YYYY-MM"
+            mes_key = p.date_watched[:7]
             por_mes[mes_key] += 1
-    meses_sorted = sorted(por_mes.items())  # todos, orden cronológico
+    meses_sorted = sorted(por_mes.items())
 
-    # Top plataformas
     plataformas = defaultdict(int)
     for p in vistas:
         if p.platform:
             plataformas[p.platform] += 1
     top_plataformas = sorted(plataformas.items(), key=lambda x: x[1], reverse=True)[:6]
 
-    # Top combos de géneros — un combo por película (primeros 2 géneros)
     combos_count = defaultdict(int)
     for p in vistas:
         if not p.genres:
@@ -223,18 +208,15 @@ def stats():
         combos_count[combo] += 1
     top_generos = sorted(combos_count.items(), key=lambda x: x[1], reverse=True)[:6]
 
-    # Top directores
     directores_count = defaultdict(int)
     for p in calificadas:
         if p.director and p.director != 'Desconocido':
             directores_count[p.director] += 1
     top_directores = sorted(directores_count.items(), key=lambda x: x[1], reverse=True)[:5]
 
-    # Mejor y peor película
     mejor = max(calificadas, key=lambda x: x.rating) if calificadas else None
     peor = min(calificadas, key=lambda x: x.rating) if calificadas else None
 
-    # Película más reciente y más antigua con fecha
     con_fecha = [p for p in vistas if p.date_watched]
     con_fecha_sorted = sorted(con_fecha, key=lambda x: x.date_watched)
     primera = con_fecha_sorted[0] if con_fecha_sorted else None
@@ -242,50 +224,7 @@ def stats():
 
     total_minutos = sum(p.runtime for p in vistas if p.runtime)
 
-    # Perfil cinéfilo — solo keywords de tono/estilo/atmósfera
-    KW_UTILES = {
-        # Géneros y subgéneros
-        'psychological thriller', 'psychological horror', 'psychological drama',
-        'crime thriller', 'crime horror', 'conspiracy thriller', 'suspense mystery',
-        'neo-noir', 'dark fairy tale', 'magic realism', 'urban gothic', 'steampunk',
-        'supernatural thriller', 'supernatural horror', 'spy thriller', 'space adventure',
-        # Recursos narrativos
-        'twist', 'time-manipulation', 'time travel', 'time paradox', 'non-linear narrative',
-        'high concept', 'allegory', 'symbolism', 'ambiguity', 'surrealism',
-        'parallel universe', 'whodunit', 'story within the story',
-        # Temas y atmósfera
-        'obsession', 'manipulation', 'revenge', 'guilt', 'redemption', 'suppressed past',
-        'identity', 'melancholy', 'dystopia', 'investigation', 'vigilante',
-        'rivalry', 'betrayal', 'deception', 'cowardice', 'ambivalent',
-        # Figuras
-        'serial killer', 'detective', 'psychopath', 'cannibal', 'spy',
-        'heist', 'dream world', 'subconscious', 'memory', 'intellectual',
-        # Ciencia ficción temática
-        'wormhole', 'black hole', 'quantum mechanics', 'artificial intelligence (a.i.)',
-        'space travel', 'alien contact', 'first contact', 'extraterrestrial technology',
-        'determinism', 'communication',
-        # Tono emocional útil
-        'psychological profiling', 'cat and mouse', 'mind-blowing', 'bittersweet',
-        'moral manipulation', 'ideological clash', 'psychological predator',
-    }
-
-    kw_alto = defaultdict(int)
-    kw_bajo = defaultdict(int)
-
-    for p in calificadas:
-        if not p.keywords:
-            continue
-        kws = [k.strip() for k in p.keywords.split(',') if k.strip().lower() in KW_UTILES]
-        bucket = kw_alto if p.rating >= 75 else kw_bajo
-        for kw in kws:
-            bucket[kw] += 1
-
-    top_perfil = sorted(kw_alto.items(), key=lambda x: -x[1])[:18]
-
-    kw_evita = sorted(
-        [(kw, cnt) for kw, cnt in kw_bajo.items() if kw not in kw_alto],
-        key=lambda x: -x[1]
-    )[:8]
+    top_perfil, kw_evita = oracle_helper.build_taste_profile(calificadas)
 
     stats_data = {
         'total_vistas': len(vistas),
@@ -341,7 +280,6 @@ def save_movie():
     platform = request.form.get('platform')
     opinion = request.form.get('opinion')
 
-    # Comprueba que el usuario logueado no tenga ya esta película
     existe = Movie.query.filter_by(tmdb_id=tmdb_id, user_id=session['user_id']).first()
 
     if not existe:
@@ -363,7 +301,6 @@ def save_movie():
             generos_list = details.get('genres', [])
             generos = ", ".join([g['name'] for g in generos_list])
 
-            # MAGIA IMDB: Traemos el código de IMDb y buscamos el puntaje
             imdb_id = details.get('imdb_id')
             if imdb_id:
                 imdb_score = get_imdb_rating(imdb_id)
@@ -390,7 +327,6 @@ def delete_movie(id):
     if not session.get('user_id'):
         return redirect(url_for('login'))
 
-    # Busca la película asegurándose de que pertenece a este usuario
     pelicula = Movie.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
     db.session.delete(pelicula)
     db.session.commit()
@@ -401,7 +337,6 @@ def edit_movie(id):
     if not session.get('user_id'):
         return redirect(url_for('login'))
 
-    # Busca la película asegurándose de que pertenece a este usuario
     pelicula = Movie.query.filter_by(id=id, user_id=session['user_id']).first_or_404()
 
     if request.method == 'POST':
@@ -443,119 +378,37 @@ def oracle():
     ya_mostradas = request.json.get('ya_mostradas', []) if request.is_json else []
     ya_mostradas_ids = {str(i) for i in request.json.get('ya_mostradas_ids', [])} if request.is_json else set()
 
-    historial = []
-    for p in mis_pelis:
-        if p.is_watchlist and not p.rating and not p.abandoned:
-            historial.append(f"- {p.title} (Watchlist — NO RECOMENDAR)")
-        elif p.abandoned:
-            historial.append(f"- {p.title} (Abandonada — NO RECOMENDAR)")
-        elif p.rating:
-            historial.append(f"- {p.title} (Puntaje: {p.rating}/100)")
-        else:
-            historial.append(f"- {p.title} (Vista)")
-
     blacklist = OracleBlacklist.query.filter_by(user_id=session['user_id']).all()
-    for b in blacklist:
-        historial.append(f"- {b.title} (Descartada — NO RECOMENDAR NUNCA)")
+    shown = OracleShown.query.filter_by(user_id=session['user_id']).all()
 
-    reporte_peliculas = "\n".join(historial)
+    calificadas = [p for p in mis_pelis if p.rating is not None and not p.is_watchlist and not p.abandoned]
+    top_perfil, kw_evita = oracle_helper.build_taste_profile(calificadas)
+
+    historial_str = oracle_helper.build_historial(mis_pelis, blacklist, shown)
+    perfil_str = oracle_helper._perfil_str(top_perfil, kw_evita)
 
     excluir_str = ""
     if ya_mostradas:
-        excluir_str = f"\n\nPelículas que YA recomendé antes (NO repetir ninguna, ni siquiera el bonus): {', '.join(ya_mostradas)}."
+        excluir_str = f"\n\nPelículas que YA recomendé en ESTA misma consulta (NO repetir ninguna, ni siquiera el bonus): {', '.join(ya_mostradas)}."
 
-    prompt = f"""Actua como un critico y curador cinefilo con criterio moderno y personalidad propia.
-
-IMPORTANTE:
-Responde EXCLUSIVAMENTE en JSON valido.
-NO agregues texto fuera del JSON.
-NO uses markdown.
-NO uses ```json.
-NO expliques el formato.
-NO agregues introducciones ni cierres.
-
-No analices solo generos o popularidad.
-Detecta especificamente:
-- tipo de complejidad narrativa que disfruto,
-- nivel de ambiguedad tolerado,
-- equilibrio entre emocion e intelectualidad,
-- ritmo preferido,
-- tolerancia al simbolismo abstracto,
-- y si prefiero peliculas contemplativas o de tension constante.
-
-NO confundas:
-- complejidad emocional y narrativa accesible
-con
-- surrealismo abstracto o cine excesivamente simbolico.
-
-Dale MUCHISIMO mas peso a:
-- peliculas con puntajes 85+,
-- peliculas abandonadas,
-- peliculas odiadas,
-que a peliculas entre 65 y 75.
-
-No recomiendes peliculas solo porque son consideradas obras maestras o cine importante.
-Prioriza compatibilidad real con mi sensibilidad cinematografica.
-
-Peliculas:
-{reporte_peliculas}{excluir_str}
-
-REGLA FUNDAMENTAL:
-No recomiendes ninguna pelicula que aparezca en el historial.
-Los titulos pueden estar en español o ingles, con o sin año.
-Si el titulo es parecido Y comparte director o elenco, tratalos como la misma pelicula.
-
-La respuesta DEBE seguir EXACTAMENTE este esquema JSON:
-{{
-  "analysis": {{
-    "main_tastes": [],
-    "narrative_preferences": [],
-    "emotional_profile": [],
-    "preferred_pacing": "",
-    "ambiguity_tolerance": "",
-    "symbolism_tolerance": "",
-    "complexity_type": "",
-    "what_the_user_avoids": []
-  }},
-  "recommendations": [
-    {{
-      "title": "",
-      "original_title": "",
-      "year": "",
-      "director": "",
-      "why_it_fits": "",
-      "feeling_after_watching": ""
-    }}
-  ],
-  "bonus": {{
-    "title": "",
-    "original_title": "",
-    "year": "",
-    "director": "",
-    "why_it_is_essential": "",
-    "feeling_after_watching": ""
-  }}
-}}
-
-REGLAS IMPORTANTES:
-- recommendations debe tener EXACTAMENTE {cantidad + 3} peliculas.
-- bonus debe tener EXACTAMENTE 1 pelicula.
-- NO repitas peliculas del historial.
-- NO recomiendes peliculas de la watchlist.
-- NO recomiendes peliculas abandonadas.
-- NO uses placeholders.
-- NO dejes campos vacios.
-- Las recomendaciones deben sentirse personalizadas y especificas para el usuario.
-- El bonus debe ser una pelicula enorme, influyente o mundialmente considerada imprescindible, incluso si sale un poco de los gustos habituales del usuario."""
+    prompt = oracle_helper.build_json_prompt(historial_str, perfil_str, excluir_str, cantidad)
 
     try:
         groq_key = os.getenv('GROQ_API_KEY')
         resp = requests.post(
             'https://api.groq.com/openai/v1/chat/completions',
             headers={'Authorization': f'Bearer {groq_key}', 'Content-Type': 'application/json'},
-            json={'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': prompt}], 'temperature': 0.8},
+            json={
+                'model': 'llama-3.3-70b-versatile',
+                'messages': [{'role': 'user', 'content': prompt}],
+                'temperature': 0.9,
+                'top_p': 0.9,
+                'response_format': {'type': 'json_object'}
+            },
             timeout=30
         )
+        if resp.status_code == 429:
+            return jsonify({'error': "El Oráculo está saturado (límite de la IA gratuita). Esperá unos segundos y volvé a intentar."})
         resp.raise_for_status()
 
         texto_limpio = resp.json()['choices'][0]['message']['content'].strip()
@@ -585,24 +438,20 @@ REGLAS IMPORTANTES:
                 'bonus': True
             })
 
-        # IDs y blacklist existentes para filtrar server-side
         existing_tmdb_ids = {str(p.tmdb_id) for p in mis_pelis if p.tmdb_id}
-        blacklist_ids = {str(b.tmdb_id) for b in OracleBlacklist.query.filter_by(user_id=session['user_id']).all() if b.tmdb_id}
-        excluir_ids = existing_tmdb_ids | blacklist_ids | ya_mostradas_ids
+        blacklist_ids = {str(b.tmdb_id) for b in blacklist if b.tmdb_id}
+        shown_ids = {str(s.tmdb_id) for s in shown if s.tmdb_id}
+        excluir_ids = existing_tmdb_ids | blacklist_ids | shown_ids | ya_mostradas_ids
 
-        # ENRIQUECER CON TMDB
-        tmdb_api_key = os.getenv('TMDB_API_KEY')
         resultados_finales = []
 
         for rec in todos:
-            search_url = f"https://api.themoviedb.org/3/search/movie?api_key={tmdb_api_key}&query={rec['titulo']}&year={rec['anio']}&language=es-ES"
-            tmdb_res = requests.get('https://api.themoviedb.org/3/search/movie', params={'api_key': tmdb_api_key, 'query': rec['titulo'], 'year': rec['anio'], 'language': 'es-ES'}, timeout=10).json()
+            peli = oracle_helper.buscar_en_tmdb(rec['titulo'], rec['anio'])
 
             poster_fallback = '/static/mbvault-512.png'
             es_bonus = rec.get('bonus', False)
 
-            if tmdb_res.get('results'):
-                peli = tmdb_res['results'][0]
+            if peli:
                 details = get_movie_details(peli['id'])
                 imdb_score = None
                 if details and details.get('imdb_id'):
@@ -637,10 +486,21 @@ REGLAS IMPORTANTES:
                     'bonus': es_bonus
                 })
 
-        # Separar regulares y bonus, limitar regulares a cantidad solicitada
         regulares = [r for r in resultados_finales if not r['bonus']][:cantidad]
         bonus = [r for r in resultados_finales if r['bonus']][:1]
-        return jsonify({'success': True, 'peliculas': regulares + bonus})
+        finales = regulares + bonus
+
+        if not regulares:
+            return jsonify({'error': "El Oráculo no encontró nada nuevo esta vez (probablemente repitió algo que ya viste o descartaste). Probá de nuevo."})
+
+        ya_guardados = {s.tmdb_id for s in shown}
+        for r in finales:
+            if r['tmdb_id'] and r['tmdb_id'] not in ya_guardados:
+                db.session.add(OracleShown(user_id=session['user_id'], tmdb_id=r['tmdb_id'], title=r['titulo']))
+                ya_guardados.add(r['tmdb_id'])
+        db.session.commit()
+
+        return jsonify({'success': True, 'peliculas': finales})
 
     except Exception as e:
         app.logger.error('Oracle failure: %s', type(e).__name__)
@@ -651,100 +511,16 @@ def oracle_prompt():
     if not session.get('user_id'):
         return jsonify({'error': 'Sesión expirada'})
     mis_pelis = Movie.query.filter_by(user_id=session['user_id']).all()
-    historial = []
-    for p in mis_pelis:
-        if p.is_watchlist and not p.rating and not p.abandoned:
-            historial.append(f"'{p.title}' (En mi Watchlist - NO RECOMENDAR)")
-        elif p.abandoned:
-            historial.append(f"'{p.title}' (Abandonada - Odio esto)")
-        elif p.rating:
-            historial.append(f"'{p.title}' (Puntaje: {p.rating}/100)")
-        else:
-            historial.append(f"'{p.title}' (Vista)")
-    lineas = "\n".join(historial)
-    prompt = f"""Actua como un critico y curador cinefilo con criterio moderno y personalidad propia.
+    blacklist = OracleBlacklist.query.filter_by(user_id=session['user_id']).all()
+    shown = OracleShown.query.filter_by(user_id=session['user_id']).all()
 
-No analices solo generos o popularidad.
-Detecta especificamente:
-- tipo de complejidad narrativa que disfruto,
-- nivel de ambiguedad tolerado,
-- equilibrio entre emocion e intelectualidad,
-- ritmo preferido,
-- tolerancia al simbolismo abstracto,
-- y si prefiero peliculas contemplativas o de tension constante.
+    calificadas = [p for p in mis_pelis if p.rating is not None and not p.is_watchlist and not p.abandoned]
+    top_perfil, kw_evita = oracle_helper.build_taste_profile(calificadas)
 
-NO confundas:
-- complejidad emocional y narrativa accesible
-con
-- surrealismo abstracto o cine excesivamente simbolico.
+    historial_str = oracle_helper.build_historial(mis_pelis, blacklist, shown)
+    perfil_str = oracle_helper._perfil_str(top_perfil, kw_evita)
 
-Dale MUCHISIMO mas peso a:
-- peliculas con puntajes 85+,
-- peliculas abandonadas,
-- peliculas odiadas,
-que a peliculas entre 65 y 75.
-
-No recomiendes peliculas solo porque son consideradas obras maestras o cine importante.
-Prioriza compatibilidad real con mi sensibilidad cinematografica.
-
-Peliculas:
-{lineas}
-
-REGLA FUNDAMENTAL:
-No recomiendes ninguna pelicula que aparezca en el historial.
-Los titulos pueden estar en español o ingles, con o sin año.
-Si el titulo es parecido Y comparte director o elenco, tratalos como la misma pelicula.
-
-Tu respuesta tiene DOS partes:
-
-PARTE 1:
-Recomendame exactamente 3 peliculas que NO esten en la lista anterior y que encajen MUY bien con mis gustos.
-
-Evita recomendaciones genericas.
-Explica especificamente por que cada una conecta conmigo.
-
-Prioriza:
-- compatibilidad emocional,
-- tono,
-- tension,
-- tipo de narrativa,
-- atmosfera,
-- y sensibilidad cinematografica.
-
-NO priorices solamente:
-- genero,
-- popularidad,
-- puntuacion critica,
-- ni peliculas "complejas" porque si.
-
-Para cada recomendacion indica:
-- titulo original,
-- año,
-- director,
-- por que la recomendas especificamente para mi,
-- y que sensacion deja despues de verla.
-
-PARTE 2 - BONUS SALVAJE:
-
-Recomendame UNA sola pelicula fuera de mis gustos habituales, pero que sea considerada una experiencia cinematografica imprescindible y ampliamente reconocida.
-
-NO quiero:
-- cine experimental,
-- peliculas de nicho,
-- cine extremadamente artistico,
-- ni recomendaciones "para entendidos".
-
-Quiero una pelicula enorme, influyente o mundialmente considerada un peliculon.
-
-Para la recomendacion bonus indica:
-- titulo original,
-- año,
-- director,
-- por que es considerada imprescindible,
-- y que sensacion deja despues de verla.
-
-No hagas listas genericas.
-Prioriza personalidad, precision y criterio antes que popularidad."""
+    prompt = oracle_helper.build_manual_prompt(historial_str, perfil_str)
     return jsonify({'prompt': prompt})
 
 @app.route('/dashboard/oracle/discard', methods=['POST'])
@@ -770,12 +546,10 @@ def oracle_add_watchlist():
     titulo = data.get('titulo')
     poster = data.get('poster')
 
-    # 1. Verificamos que no la tengas ya en la bóveda
     existe = Movie.query.filter_by(user_id=session['user_id'], tmdb_id=tmdb_id).first()
     if existe:
         return jsonify({'success': False, 'error': 'Ya está en tu colección'})
 
-    # 2. Vamos a TMDB a buscar la data completa (Director, Cast, Géneros y ahora IMDb)
     try:
         details = get_movie_details(tmdb_id)
         director = 'Desconocido'
@@ -800,7 +574,6 @@ def oracle_add_watchlist():
         kw_list = get_movie_keywords(tmdb_id)
         keywords_str = ", ".join(kw_list) if kw_list else None
 
-        # 3. La guardamos en la Watchlist con TODOS los datos
         nueva_peli = Movie(
             user_id=session['user_id'],
             tmdb_id=tmdb_id,

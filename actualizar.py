@@ -22,6 +22,7 @@ with app.app_context():
     for col_sql, col_name in [
         ("ALTER TABLE movie ADD COLUMN imdb_score VARCHAR(10)", "imdb_score"),
         ("ALTER TABLE movie ADD COLUMN runtime INTEGER", "runtime"),
+        ("ALTER TABLE movie ADD COLUMN keywords TEXT", "keywords"),
         ("ALTER TABLE movie ADD COLUMN created_at TIMESTAMP", "created_at"),
     ]:
         try:
