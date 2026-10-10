@@ -228,7 +228,7 @@ def stats():
     top_perfil, kw_evita = oracle_helper.build_taste_profile(calificadas)
 
     stats_data = {
-        'total_vistas': len(vistas),
+        'total_vistas': len(calificadas),
         'total_minutos': total_minutos,
         'total_calificadas': len(calificadas),
         'total_abandonadas': len(abandonadas),
